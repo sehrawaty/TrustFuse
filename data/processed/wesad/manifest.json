@@ -1,0 +1,301 @@
+{
+  "dataset": "WESAD",
+  "key": "wesad",
+  "format": "trustfuse-processed-v1",
+  "source_archive": "WESAD.zip",
+  "source_url": "https://uni-siegen.sciebo.de/s/HGdUkoNlW1Ub0Gx/download",
+  "license": "Academic, non-commercial research use (see original WESAD readme)",
+  "citation": "P. Schmidt, A. Reiss, R. Duerichen, C. Marberger, K. Van Laerhoven, \"Introducing WESAD, a Multimodal Dataset for Wearable Stress and Affect Detection\", ICMI 2018. doi:10.1145/3242969.3242985",
+  "streams": {
+    "bvp": {
+      "hz": 64,
+      "dtype": "float32",
+      "unit": "a.u."
+    },
+    "acc": {
+      "hz": 32,
+      "dtype": "int8",
+      "unit": "1/64 g"
+    },
+    "eda": {
+      "hz": 4,
+      "dtype": "float32",
+      "unit": "µS"
+    },
+    "temp": {
+      "hz": 4,
+      "dtype": "float32",
+      "unit": "°C"
+    },
+    "label": {
+      "hz": 4,
+      "dtype": "int8",
+      "names": {
+        "0": "transient",
+        "1": "baseline",
+        "2": "stress",
+        "3": "amusement",
+        "4": "meditation",
+        "5": "ignore",
+        "6": "ignore",
+        "7": "ignore"
+      }
+    }
+  },
+  "subjects": [
+    {
+      "subject": "S2",
+      "file": "S2.npz",
+      "sha256": "8e73e6c0194962081fde10cbd4cbd67ada14d2cfe5aa92e8f2b43ac5806d5d80",
+      "bytes": 1273252,
+      "duration_s": 6079.0,
+      "label_seconds": {
+        "0": 3061.0,
+        "1": 1144.0,
+        "2": 615.0,
+        "3": 362.0,
+        "4": 768.0,
+        "6": 65.0,
+        "7": 64.0
+      }
+    },
+    {
+      "subject": "S3",
+      "file": "S3.npz",
+      "sha256": "b1cc87c2372906e9b9dbba5332c5dde307329ba03fe7e9aeba2bcd3dc89383e5",
+      "bytes": 1232009,
+      "duration_s": 6493.0,
+      "label_seconds": {
+        "0": 3351.0,
+        "1": 1140.0,
+        "2": 640.0,
+        "3": 375.0,
+        "4": 780.0,
+        "5": 73.0,
+        "6": 67.0,
+        "7": 67.0
+      }
+    },
+    {
+      "subject": "S4",
+      "file": "S4.npz",
+      "sha256": "8791e326daed37ffaef9afcd8d34b83207c17e6ff54745844644823cdf85eb0f",
+      "bytes": 1368933,
+      "duration_s": 6423.0,
+      "label_seconds": {
+        "0": 3306.0,
+        "1": 1158.0,
+        "2": 635.0,
+        "3": 372.0,
+        "4": 805.0,
+        "5": 51.0,
+        "6": 44.0,
+        "7": 52.0
+      }
+    },
+    {
+      "subject": "S5",
+      "file": "S5.npz",
+      "sha256": "aafa2c9f23f3ec4e347a812912929235df4be7f2169cb8e7881d9e5b42ed78a5",
+      "bytes": 1304127,
+      "duration_s": 6258.0,
+      "label_seconds": {
+        "0": 3061.0,
+        "1": 1198.0,
+        "2": 645.0,
+        "3": 374.0,
+        "4": 794.0,
+        "5": 72.0,
+        "6": 44.0,
+        "7": 70.0
+      }
+    },
+    {
+      "subject": "S6",
+      "file": "S6.npz",
+      "sha256": "4e71b7d7b6a88ef72ea475090a2992ad2c2e0f7e0f62a56c6e0d00ab1c008fa9",
+      "bytes": 1460739,
+      "duration_s": 7071.0,
+      "label_seconds": {
+        "0": 3905.0,
+        "1": 1180.0,
+        "2": 650.0,
+        "3": 372.0,
+        "4": 787.0,
+        "5": 58.0,
+        "6": 50.0,
+        "7": 69.0
+      }
+    },
+    {
+      "subject": "S7",
+      "file": "S7.npz",
+      "sha256": "0cb07b893ab8debb5722049702c3145b12f3c95fd1a7cf73b46b7b40cceff3f5",
+      "bytes": 981786,
+      "duration_s": 5238.0,
+      "label_seconds": {
+        "0": 2103.0,
+        "1": 1186.0,
+        "2": 640.0,
+        "3": 372.0,
+        "4": 790.0,
+        "5": 50.0,
+        "6": 44.0,
+        "7": 53.0
+      }
+    },
+    {
+      "subject": "S8",
+      "file": "S8.npz",
+      "sha256": "ac8b2ca3d2f8d7eef73a952d4029c7555d6abffc840acafe573ddd9401b64493",
+      "bytes": 1136255,
+      "duration_s": 5466.0,
+      "label_seconds": {
+        "0": 2309.0,
+        "1": 1169.0,
+        "2": 670.0,
+        "3": 370.0,
+        "4": 796.0,
+        "5": 49.0,
+        "6": 51.0,
+        "7": 52.0
+      }
+    },
+    {
+      "subject": "S9",
+      "file": "S9.npz",
+      "sha256": "b4765243d9190fd5c73a3c010797f5cdca18c3e5f0498de375ba6a0dcce960b2",
+      "bytes": 1042477,
+      "duration_s": 5223.0,
+      "label_seconds": {
+        "0": 2051.0,
+        "1": 1180.0,
+        "2": 645.0,
+        "3": 372.0,
+        "4": 793.0,
+        "5": 60.0,
+        "6": 62.0,
+        "7": 60.0
+      }
+    },
+    {
+      "subject": "S10",
+      "file": "S10.npz",
+      "sha256": "b633c62a61953296a05aa5e87b1a7868740aaf8a7b1ade3d1c4b5726b46ca420",
+      "bytes": 1031628,
+      "duration_s": 5496.0,
+      "label_seconds": {
+        "0": 2270.0,
+        "1": 1180.0,
+        "2": 725.0,
+        "3": 372.0,
+        "4": 796.0,
+        "5": 51.0,
+        "6": 45.0,
+        "7": 57.0
+      }
+    },
+    {
+      "subject": "S11",
+      "file": "S11.npz",
+      "sha256": "b8a5e70a8eaf12a936b945726dfa649a3bad4b4ffea5cf89d682eac19099a26f",
+      "bytes": 1024082,
+      "duration_s": 5233.0,
+      "label_seconds": {
+        "0": 2062.0,
+        "1": 1180.0,
+        "2": 680.0,
+        "3": 368.0,
+        "4": 791.0,
+        "5": 50.0,
+        "6": 52.0,
+        "7": 50.0
+      }
+    },
+    {
+      "subject": "S13",
+      "file": "S13.npz",
+      "sha256": "5e006787899b7a8c626b92e4c2c10f89d347f395f1ebd7a025c2be94628daa74",
+      "bytes": 1212009,
+      "duration_s": 5537.0,
+      "label_seconds": {
+        "0": 2399.0,
+        "1": 1180.0,
+        "2": 664.0,
+        "3": 382.0,
+        "4": 795.0,
+        "5": 49.0,
+        "6": 48.0,
+        "7": 20.0
+      }
+    },
+    {
+      "subject": "S14",
+      "file": "S14.npz",
+      "sha256": "8b3b8c1730390cdda3add949cab180999eff1377e78f56f9136d480de473c210",
+      "bytes": 1112978,
+      "duration_s": 5548.0,
+      "label_seconds": {
+        "0": 2355.0,
+        "1": 1180.0,
+        "2": 675.0,
+        "3": 372.0,
+        "4": 794.0,
+        "5": 63.0,
+        "6": 55.0,
+        "7": 54.0
+      }
+    },
+    {
+      "subject": "S15",
+      "file": "S15.npz",
+      "sha256": "ebca114adf4366d20afba2dae3520c83c22c7c553e51f42091e3024364cd1f07",
+      "bytes": 1025700,
+      "duration_s": 5252.0,
+      "label_seconds": {
+        "0": 2082.0,
+        "1": 1175.0,
+        "2": 686.0,
+        "3": 372.0,
+        "4": 794.0,
+        "5": 50.0,
+        "6": 47.0,
+        "7": 46.0
+      }
+    },
+    {
+      "subject": "S16",
+      "file": "S16.npz",
+      "sha256": "9a286e2b6fdc0c8dbad94ed13bef1509acf30dc3e11839273c2c37790c1a1b93",
+      "bytes": 1067901,
+      "duration_s": 5631.0,
+      "label_seconds": {
+        "0": 2453.0,
+        "1": 1180.0,
+        "2": 673.0,
+        "3": 368.0,
+        "4": 792.0,
+        "5": 55.0,
+        "6": 57.0,
+        "7": 53.0
+      }
+    },
+    {
+      "subject": "S17",
+      "file": "S17.npz",
+      "sha256": "faf65a0d41f66a8c60f9bc1ca3a7450766c7260054c785f414b05d9caed69718",
+      "bytes": 1166063,
+      "duration_s": 5920.0,
+      "label_seconds": {
+        "0": 2739.0,
+        "1": 1181.0,
+        "2": 723.0,
+        "3": 372.0,
+        "4": 731.0,
+        "5": 58.0,
+        "6": 59.0,
+        "7": 57.0
+      }
+    }
+  ]
+}

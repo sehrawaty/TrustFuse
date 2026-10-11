@@ -1,0 +1,315 @@
+{
+  "dataset": "PPG-DaLiA",
+  "key": "dalia",
+  "format": "trustfuse-processed-v1",
+  "source_archive": "data.zip",
+  "source_url": "https://archive.ics.uci.edu/static/public/495/ppg+dalia.zip",
+  "license": "CC BY 4.0 (UCI Machine Learning Repository)",
+  "citation": "A. Reiss, I. Indlekofer, P. Schmidt, K. Van Laerhoven, \"Deep PPG: Large-Scale Heart Rate Estimation with Convolutional Neural Networks\", Sensors 19(14):3079, 2019. doi:10.3390/s19143079",
+  "streams": {
+    "bvp": {
+      "hz": 64,
+      "dtype": "float32",
+      "unit": "a.u."
+    },
+    "acc": {
+      "hz": 32,
+      "dtype": "int8",
+      "unit": "1/64 g"
+    },
+    "eda": {
+      "hz": 4,
+      "dtype": "float32",
+      "unit": "µS"
+    },
+    "temp": {
+      "hz": 4,
+      "dtype": "float32",
+      "unit": "°C"
+    },
+    "label": {
+      "hz": 4,
+      "dtype": "int8",
+      "names": {
+        "0": "transient",
+        "1": "sitting",
+        "2": "stairs",
+        "3": "table soccer",
+        "4": "cycling",
+        "5": "driving",
+        "6": "lunch",
+        "7": "walking",
+        "8": "working"
+      }
+    }
+  },
+  "subjects": [
+    {
+      "subject": "S1",
+      "file": "S1.npz",
+      "sha256": "5912a7f18d09b1e8b3170d386b2c99716dda57982620d9c46456d73e741f697c",
+      "bytes": 2263070,
+      "duration_s": 9212.0,
+      "label_seconds": {
+        "0": 2281.0,
+        "1": 700.0,
+        "2": 287.0,
+        "3": 345.0,
+        "4": 412.0,
+        "5": 889.0,
+        "6": 2355.0,
+        "7": 754.0,
+        "8": 1189.0
+      }
+    },
+    {
+      "subject": "S2",
+      "file": "S2.npz",
+      "sha256": "192bc257a62824f9ffd439defb1dc89e786987cd02dacdcb4c412b9f0474d481",
+      "bytes": 1884239,
+      "duration_s": 8205.0,
+      "label_seconds": {
+        "0": 2527.0,
+        "1": 600.0,
+        "2": 267.0,
+        "3": 304.0,
+        "4": 387.0,
+        "5": 920.0,
+        "6": 1220.0,
+        "7": 689.0,
+        "8": 1291.0
+      }
+    },
+    {
+      "subject": "S3",
+      "file": "S3.npz",
+      "sha256": "60c17abb3d9721ae41e8bec0c4c6af11898f399bf33144ae1bec8391cc3b3ad1",
+      "bytes": 2107841,
+      "duration_s": 8741.0,
+      "label_seconds": {
+        "0": 2016.0,
+        "1": 600.0,
+        "2": 435.0,
+        "3": 293.0,
+        "4": 379.0,
+        "5": 910.0,
+        "6": 2160.0,
+        "7": 738.0,
+        "8": 1210.0
+      }
+    },
+    {
+      "subject": "S4",
+      "file": "S4.npz",
+      "sha256": "48deb6b66e467f77c7773988ce722d055bcb16d5409ce8bbb335eec09a6d22e5",
+      "bytes": 2187284,
+      "duration_s": 9150.0,
+      "label_seconds": {
+        "0": 2518.0,
+        "1": 570.0,
+        "2": 523.0,
+        "3": 328.0,
+        "4": 475.0,
+        "5": 1007.0,
+        "6": 1895.0,
+        "7": 594.0,
+        "8": 1240.0
+      }
+    },
+    {
+      "subject": "S5",
+      "file": "S5.npz",
+      "sha256": "26d56a280587c42f48f920e5178ba00bda6b640b947d4e454781d8fc5efe1414",
+      "bytes": 2410049,
+      "duration_s": 9305.0,
+      "label_seconds": {
+        "0": 2574.0,
+        "1": 600.0,
+        "2": 465.0,
+        "3": 290.0,
+        "4": 432.0,
+        "5": 830.0,
+        "6": 2255.0,
+        "7": 589.0,
+        "8": 1270.0
+      }
+    },
+    {
+      "subject": "S6",
+      "file": "S6.npz",
+      "sha256": "513242e9cc8e6224aad728d9d3ffcc9b475bf8a219e53378691cdbef347b922d",
+      "bytes": 1346113,
+      "duration_s": 5250.0,
+      "label_seconds": {
+        "0": 2297.0,
+        "1": 633.0,
+        "2": 430.0,
+        "3": 309.0,
+        "4": 533.0,
+        "5": 1048.0
+      }
+    },
+    {
+      "subject": "S7",
+      "file": "S7.npz",
+      "sha256": "6d0c09f57657a95c07195af8604edc7b91545d8c66933ef3e8bbb5ff22b75db7",
+      "bytes": 2242552,
+      "duration_s": 9343.0,
+      "label_seconds": {
+        "0": 2198.0,
+        "1": 618.0,
+        "2": 406.0,
+        "3": 274.0,
+        "4": 503.0,
+        "5": 1035.0,
+        "6": 2425.0,
+        "7": 709.0,
+        "8": 1175.0
+      }
+    },
+    {
+      "subject": "S8",
+      "file": "S8.npz",
+      "sha256": "2db5ba3aea220c562625925b991b1a1ebbfd4c0ed1e1a6a86795079f8eecca98",
+      "bytes": 1870966,
+      "duration_s": 8080.0,
+      "label_seconds": {
+        "0": 2082.0,
+        "1": 600.0,
+        "2": 412.0,
+        "3": 323.0,
+        "4": 420.0,
+        "5": 770.0,
+        "6": 1800.0,
+        "7": 481.0,
+        "8": 1192.0
+      }
+    },
+    {
+      "subject": "S9",
+      "file": "S9.npz",
+      "sha256": "12527deb474d2d4efa01682451c009633b20eefd8f65053f37cde257d5114aa8",
+      "bytes": 2069426,
+      "duration_s": 8560.0,
+      "label_seconds": {
+        "0": 2007.0,
+        "1": 600.0,
+        "2": 483.0,
+        "3": 285.0,
+        "4": 554.0,
+        "5": 955.0,
+        "6": 1842.0,
+        "7": 589.0,
+        "8": 1245.0
+      }
+    },
+    {
+      "subject": "S10",
+      "file": "S10.npz",
+      "sha256": "dbd7cff808403002dc8c5072d0e2177898ec0fb66ed3f3980ce1bfd722eb4625",
+      "bytes": 2509793,
+      "duration_s": 10648.0,
+      "label_seconds": {
+        "0": 3542.0,
+        "1": 598.0,
+        "2": 467.0,
+        "3": 305.0,
+        "4": 488.0,
+        "5": 937.0,
+        "6": 2084.0,
+        "7": 1082.0,
+        "8": 1145.0
+      }
+    },
+    {
+      "subject": "S11",
+      "file": "S11.npz",
+      "sha256": "014ca97a4c5a0a302cf0ffd5e7387709c25b9679442715d73b42bcfe828e79f0",
+      "bytes": 2219733,
+      "duration_s": 9048.0,
+      "label_seconds": {
+        "0": 2035.0,
+        "1": 600.0,
+        "2": 457.0,
+        "3": 324.0,
+        "4": 490.0,
+        "5": 860.0,
+        "6": 2408.0,
+        "7": 654.0,
+        "8": 1220.0
+      }
+    },
+    {
+      "subject": "S12",
+      "file": "S12.npz",
+      "sha256": "e25a1c5db56897f79726a599b2b91cc8d3098a2b2bd613399978e45f8ac4dafc",
+      "bytes": 2009390,
+      "duration_s": 7914.0,
+      "label_seconds": {
+        "0": 1994.0,
+        "1": 602.0,
+        "2": 484.0,
+        "3": 280.0,
+        "4": 480.0,
+        "5": 890.0,
+        "6": 1460.0,
+        "7": 529.0,
+        "8": 1195.0
+      }
+    },
+    {
+      "subject": "S13",
+      "file": "S13.npz",
+      "sha256": "3958dafcb16639ab5698c8ab07632b225028bf8a7671db3e1dc90c148b1445f1",
+      "bytes": 2285638,
+      "duration_s": 9136.0,
+      "label_seconds": {
+        "0": 2387.0,
+        "1": 605.0,
+        "2": 497.0,
+        "3": 290.0,
+        "4": 498.0,
+        "5": 897.0,
+        "6": 2028.0,
+        "7": 709.0,
+        "8": 1225.0
+      }
+    },
+    {
+      "subject": "S14",
+      "file": "S14.npz",
+      "sha256": "e274435ec8352088605458957a5ea879e6ed0606c2aaa1ff4e1280098bafc497",
+      "bytes": 2227610,
+      "duration_s": 8958.0,
+      "label_seconds": {
+        "0": 2562.0,
+        "1": 608.0,
+        "2": 456.0,
+        "3": 325.0,
+        "4": 502.0,
+        "5": 954.0,
+        "6": 1731.0,
+        "7": 615.0,
+        "8": 1205.0
+      }
+    },
+    {
+      "subject": "S15",
+      "file": "S15.npz",
+      "sha256": "98a4a9d03a111b10f6517f779616241e0871e020d385689f8a41d4129df542df",
+      "bytes": 1859111,
+      "duration_s": 7939.0,
+      "label_seconds": {
+        "0": 2063.0,
+        "1": 611.0,
+        "2": 419.0,
+        "3": 354.0,
+        "4": 405.0,
+        "5": 785.0,
+        "6": 1440.0,
+        "7": 659.0,
+        "8": 1203.0
+      }
+    }
+  ]
+}

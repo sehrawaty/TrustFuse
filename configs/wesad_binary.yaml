@@ -1,0 +1,14 @@
+# Headline experiment: WESAD stress vs. non-stress, full leave-one-subject-out (15 folds).
+name: WESAD binary — full LOSO
+task: wesad_binary
+description: >-
+  Stress (TSST) vs. non-stress (baseline + amusement) from wrist BVP, ACC, EDA and skin
+  temperature. Fixed concatenation fusion vs. reliability-aware fusion under the full SMSA matrix.
+split: loso
+n_val: 2
+variants: [fusion, moddrop, uni_bvp, uni_acc, uni_eda, uni_temp]
+seeds: [0, 1, 2]
+aux_seeds: [0]
+eval_variants: [fusion, moddrop]
+eval_seeds: [0, 1, 2]
+manifest_seed: 0

@@ -1,0 +1,14 @@
+# Focused validation: PPG-DaLiA, PPG/BVP + accelerometer only, eight daily activities, full LOSO.
+name: PPG-DaLiA activity — full LOSO
+task: dalia_activity
+description: >-
+  Focused PPG/BVP + accelerometer setting from daily-life recordings. Tests whether the
+  suppression vulnerability and the defense transfer to a two-modality wearable.
+split: loso
+n_val: 2
+variants: [fusion, moddrop, uni_bvp, uni_acc]
+seeds: [0]
+aux_seeds: [0]
+eval_variants: [fusion, moddrop]
+eval_seeds: [0]
+manifest_seed: 0

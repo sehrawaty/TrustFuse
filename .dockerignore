@@ -1,0 +1,13 @@
+.git
+**/node_modules
+**/__pycache__
+**/*.pyc
+.runtime*
+.logs
+data
+artifacts
+configs
+web/dist
+*.md
+!README.md
+.env

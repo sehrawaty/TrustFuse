@@ -1,0 +1,14 @@
+# raw dataset archives are large and re-downloadable (see data/DATA_LICENSE.md)
+data/raw/
+# runtime state of the running application
+.runtime/
+.runtime-test/
+.logs/
+.env
+# build output / dependencies
+web/node_modules/
+web/dist/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+*.calib.tmp

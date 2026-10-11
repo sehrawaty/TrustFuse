@@ -1,0 +1,47 @@
+# TrustFuse stack: two containers (~0.4 GB idle, < 1 GB peak) inside a 1.5 GB Docker budget.
+name: trustfuse
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    image: trustfuse-api:1.0
+    container_name: trustfuse-api
+    volumes:
+      - ./data:/app/data:ro
+      - ./artifacts:/app/artifacts:ro
+      - ./configs:/app/configs:ro
+      - runtime:/app/.runtime
+    environment:
+      TRUSTFUSE_THREADS: ${API_THREADS:-2}
+      OMP_NUM_THREADS: ${API_THREADS:-2}
+    mem_limit: ${API_MEMORY:-900m}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)"]
+      interval: 10s
+      timeout: 4s
+      start_period: 20s
+      retries: 6
+
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    image: trustfuse-web:1.0
+    container_name: trustfuse-web
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    mem_limit: 64m
+    restart: unless-stopped
+
+volumes:
+  runtime:
+
+networks:
+  default:
+    name: trustfuse-net

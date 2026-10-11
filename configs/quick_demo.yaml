@@ -1,0 +1,32 @@
+# Live-demo preset: one held-out subject, short training. Finishes in a few minutes on a laptop
+# inside the 1.5 GB Docker budget. Results are written to the runtime area, never over the
+# shipped canonical results.
+name: Quick demo — single held-out subject
+task: wesad_binary
+description: Train the fusion model on 12 subjects, validate on 2, attack and defend the held-out subject.
+split: holdout
+test_subjects: [S2]
+n_val: 2
+variants: [fusion]
+seeds: [0]
+aux_seeds: [0]
+eval_variants: [fusion]
+eval_seeds: [0]
+manifest_seed: 0
+train:
+  epochs: 8
+  patience: 3
+attacks:
+  severities: [0.2, 0.6, 1.0]
+  mask_fills: [zero]
+  attenuations: [0.2, 0.6]
+  noise_snr_db: [5.0]
+  burst_windows: [1, 5]
+  burst_placements_per_subject: 4
+  strategies: [random_drop, targeted]
+reliability:
+  ablations: []
+stats:
+  n_boot: 500
+models_root: runtime
+results_root: runtime

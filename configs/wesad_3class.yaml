@@ -1,0 +1,14 @@
+# Supplementary experiment: WESAD baseline / stress / amusement, full LOSO.
+name: WESAD 3-class — full LOSO
+task: wesad_3class
+description: >-
+  Three-class affect recognition (baseline, stress, amusement) with the same models, attack
+  matrix and defense as the headline experiment.
+split: loso
+n_val: 2
+variants: [fusion, moddrop, uni_bvp, uni_acc, uni_eda, uni_temp]
+seeds: [0]
+aux_seeds: [0]
+eval_variants: [fusion, moddrop]
+eval_seeds: [0]
+manifest_seed: 0

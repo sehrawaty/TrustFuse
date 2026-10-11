@@ -1,0 +1,9 @@
+# Runtime dependencies of the API image (torch is installed separately from the CPU wheel index).
+numpy==2.5.4
+scipy==1.18.1
+pandas==3.0.6
+matplotlib==3.11.2
+fastapi==0.143.0
+uvicorn==0.54.0
+pydantic==2.14.0
+pyyaml==6.0.3

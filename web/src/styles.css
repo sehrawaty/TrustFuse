@@ -1,0 +1,83 @@
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/500.css";
+@import "@fontsource/ibm-plex-sans/600.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+@import "katex/dist/katex.min.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  TrustFuse design tokens (light).
+  Chrome is monochrome; colour is reserved for meaning:
+    - modalities (validated categorical order): BVP magenta, ACC violet, EDA aqua, TEMP yellow
+    - fixed vs. reliability-aware fusion: orange vs. blue
+    - status: attack (critical red), flag (warning amber, always with icon + label), good (green)
+*/
+:root {
+  color-scheme: light;
+  --paper: 245 246 248;
+  --surface: 255 255 255;
+  --sunken: 249 250 251;
+  --line: 228 231 236;
+  --line-strong: 208 213 221;
+  --ink: 16 24 40;
+  --ink-2: 52 64 84;
+  --muted: 102 112 133;
+  --faint: 152 162 179;
+  --focus: 42 120 214;
+
+  --attack: 208 59 59;
+  --attack-soft: 253 236 236;
+  --flag: 250 178 25;
+  --flag-ink: 147 92 6;
+  --flag-soft: 255 247 228;
+  --good: 12 163 12;
+  --good-ink: 6 118 71;
+  --good-soft: 232 247 238;
+
+  --fixed: 235 104 52;
+  --defended: 42 120 214;
+  --defended-soft: 235 243 252;
+
+  --bvp: 232 123 164;
+  --acc: 98 80 214;
+  --eda: 27 175 122;
+  --temp: 237 161 0;
+}
+
+@layer base {
+  html {
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    @apply bg-paper text-ink font-sans;
+    font-feature-settings: "ss01", "cv01";
+  }
+  ::selection { background: rgb(var(--defended) / 0.18); }
+  :focus-visible { outline: 2px solid rgb(var(--focus)); outline-offset: 2px; border-radius: 4px; }
+  h1, h2, h3 { letter-spacing: -0.01em; }
+  * { scrollbar-width: thin; scrollbar-color: rgb(var(--line-strong)) transparent; }
+}
+
+@layer components {
+  .card { @apply bg-surface border border-line rounded-xl shadow-card; }
+  .card-pad { @apply p-5; }
+  .eyebrow { @apply text-2xs font-medium uppercase tracking-[0.08em] text-muted; }
+  .num { font-variant-numeric: tabular-nums; @apply font-mono; }
+  .hairline { @apply border-line; }
+  .link { @apply text-defended underline-offset-2 hover:underline; }
+  .chip { @apply inline-flex items-center gap-1.5 rounded-md border border-line bg-surface px-2 py-0.5 text-xs text-ink-2; }
+}
+
+.katex { font-size: 1.05em; }
+.katex-display { margin: 0.4em 0; overflow-x: auto; overflow-y: hidden; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
