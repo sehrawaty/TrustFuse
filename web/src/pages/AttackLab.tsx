@@ -238,7 +238,7 @@ export default function AttackLab() {
             )}
             <div>
               <div className="eyebrow mb-2 flex items-center gap-1">
-                Reliability evidence <InfoTip>Ablate the evidence channels used by the defense. The calibration distribution is recomputed for the chosen subset.</InfoTip>
+                Reliability evidence <InfoTip>Default: model-free signal quality Q, calibrated on all non-test people (validated to transfer across people). Add disagreement D or uncertainty U to see their effect; those subsets are calibrated on the held-out validation subjects.</InfoTip>
               </div>
               <div className="flex gap-2">
                 {["Q", "D", "U"].map((c) => (
@@ -493,7 +493,7 @@ function AdaptivePanel({ data, classes, onApply }: { data: AdaptiveResult; class
             ttTitle(`${MODALITY_LABEL[c.modality]} · ${c.type === "mask" ? `mask (${c.fill})` : "attenuate"} ${Math.round(c.severity * 100)}%`) +
             ttRow(COLORS.defended, "defended", classes[c.defended_pred] ?? String(c.defended_pred)) +
             ttRow(COLORS.fixed, "fixed", classes[c.fixed_pred] ?? String(c.fixed_pred)) +
-            ttRow("#fff", "suspicion −log R", c.suspicion.toFixed(2)) +
+            ttRow("#fff", "anomaly margin", c.suspicion.toFixed(2)) +
             ttRow("#fff", "flag", c.flag ? "raised" : "no")
           );
         },
@@ -503,7 +503,7 @@ function AdaptivePanel({ data, classes, onApply }: { data: AdaptiveResult; class
       series: groups.map((g) => ({
         name: g.name,
         type: "scatter",
-        symbolSize: (v: any) => 7 + Math.min(v[2], 8),
+        symbolSize: (v: any) => 7 + Math.max(0, Math.min(v[2], 8)),
         itemStyle: { color: g.color, borderColor: "#fff", borderWidth: 1 },
         data: data.candidates
           .filter(g.f)

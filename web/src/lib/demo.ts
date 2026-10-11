@@ -4,7 +4,7 @@
 export const DEMO = {
   task: "wesad_binary",
   subject: "S2",
-  window: 120,
+  window: 284,
   modality: "eda",
   modalityLabel: "EDA",
 };

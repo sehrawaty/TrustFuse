@@ -45,6 +45,6 @@ async def timeline(req: TimelineIn) -> dict:
 
 @router.get("/calibration/{task}/{subject}")
 async def calibration(task: str, subject: str, variant: str = "fusion", seed: int = 0,
-                      components: str = "QDU") -> dict:
+                      components: str = "Q") -> dict:
     comps = [c for c in components.upper() if c in "QDU"]
     return await _call(service().calibration, task, subject, variant, seed, comps or None)

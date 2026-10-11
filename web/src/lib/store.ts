@@ -45,7 +45,7 @@ export const useApp = create<AppState>((set, get) => ({
   window: {},
   attack: DEFAULT_ATTACK,
   variant: "fusion",
-  components: ["Q", "D", "U"],
+  components: ["Q"],
   run: {},
   demoStep: null,
   setTask: (task) => {

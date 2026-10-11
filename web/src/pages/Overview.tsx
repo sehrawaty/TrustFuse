@@ -14,8 +14,8 @@ const CONTRIBUTIONS = [
     body: "Selective Modality Suppression (SMSA) is formalised as an inference-time attack with masking, attenuation and burst variants, and attackers of increasing capability: random, targeted, oracle and defense-aware.",
   },
   {
-    title: "Conformal modality reliability",
-    body: "Q, D and U evidence is turned into calibrated per-modality p-values on clean validation data, which gives a low-confidence flag with a controlled false-rejection rate and a fusion gate on the same frozen model.",
+    title: "Subject-diverse conformal reliability",
+    body: "Per-modality evidence is turned into calibrated p-values, which give a low-confidence flag and a fusion gate on the same frozen model. Calibrating against many people, not just two, is what keeps false alarms on new users near the target rate.",
   },
   {
     title: "Matched security evaluation",

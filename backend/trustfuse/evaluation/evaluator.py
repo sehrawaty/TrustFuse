@@ -61,6 +61,7 @@ def select_decision(decs: list[Decision], choice: np.ndarray) -> Decision:
         weights={m: pick([d.weights[m] for d in decs]) for m in mods},
         flag=pick([d.flag for d in decs]),
         components=first.components,
+        margin={m: pick([d.margin[m] for d in decs]) for m in mods},
     )
 
 
@@ -115,7 +116,8 @@ def _subset(dec: Decision, idx: np.ndarray) -> Decision:
         evidence={m: {k: v[idx] for k, v in e.items()} for m, e in dec.evidence.items()},
         anomaly={m: v[idx] for m, v in dec.anomaly.items()},
         reliability={m: v[idx] for m, v in dec.reliability.items()},
-        weights={m: v[idx] for m, v in dec.weights.items()}, flag=dec.flag[idx], components=dec.components)
+        weights={m: v[idx] for m, v in dec.weights.items()}, flag=dec.flag[idx], components=dec.components,
+        margin={m: v[idx] for m, v in dec.margin.items()})
 
 
 class Evaluator:
@@ -369,4 +371,5 @@ def _concat(decs: list[Decision]) -> Decision:
         anomaly={m: cat([d.anomaly[m] for d in decs]) for m in f.anomaly},
         reliability={m: cat([d.reliability[m] for d in decs]) for m in f.reliability},
         weights={m: cat([d.weights[m] for d in decs]) for m in f.weights},
-        flag=cat([d.flag for d in decs]), components=f.components)
+        flag=cat([d.flag for d in decs]), components=f.components,
+        margin={m: cat([d.margin[m] for d in decs]) for m in f.margin})

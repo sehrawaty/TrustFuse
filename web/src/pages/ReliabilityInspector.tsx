@@ -30,6 +30,7 @@ export default function ReliabilityInspector() {
   const windows = useQuery({ queryKey: ["windows", task, subject], queryFn: () => api.windows(task, subject) });
   const win = winMap[windowKey(task, subject)] ?? defaultWindow(windows.data);
   const comps = components.join("") || "Q";
+  const pooled = comps === "Q";
   const calib = useQuery({ queryKey: ["calibration", task, subject, comps], queryFn: () => api.calibration(task, subject, comps), placeholderData: keepPreviousData });
   const infer = useQuery({
     queryKey: ["infer", task, subject, { attack, win, components: components.join(""), variant }],
@@ -75,8 +76,10 @@ export default function ReliabilityInspector() {
             <Eq n="3" title="Predictive uncertainty" tex={String.raw`U_m=\frac{1}{\log K}\,\mathcal{H}\!\left[\tfrac1T\textstyle\sum_{t=1}^{T} g_m^{(t)}(h_m^{(t)})\right]`}>
               Entropy of the MC-dropout mean (T = 8 passes with reproducible masks).
             </Eq>
-            <Eq n="4" title="Conformal reliability" tex={String.raw`a_m=Q_m+z(D_m)+z(U_m),\qquad R_m=\frac{1+\#\{i\in\text{val}: a^{(i)}_m\ge a_m\}}{n_{\text{val}}+1}`}>
-              Under clean, exchangeable data P(R ≤ t) ≤ t. The flag fires when the smallest R falls to α/M or below.
+            <Eq n="4" title="Conformal reliability" tex={String.raw`a_m=\sum_{c\in\mathcal{E}} z_c,\qquad R_m=\frac{1+\#\{i\in\text{ref}: a^{(i)}_m\ge a_m\}}{n_{\text{ref}}+1}`}>
+              Under clean, exchangeable data P(R ≤ t) ≤ t, and the flag fires when the smallest R falls to α/M or below. The default evidence is E = {"{Q}"}, ranked against clean
+              windows of <em>every non-test person</em>. This subject-diverse reference was chosen in a validation-only study: calibrating on two people gave 18% false
+              flags on others, while pooling gave 6%. Adding D or U uses the held-out validation subjects as the reference.
             </Eq>
             <Eq n="5" title="Reliability-gated fusion" tex={String.raw`w_m=\operatorname{clip}\!\left(1-\frac{a_m-\tau_m}{\tau_m-\operatorname{med}(a_m)},0,1\right),\qquad \tilde h_m=w_m h_m+(1-w_m)\,\mu_m`}>
               τ is the conformal 1 − α/M threshold. The same frozen classifier receives the gated embeddings.
@@ -161,8 +164,18 @@ export default function ReliabilityInspector() {
         </Card>
       </div>
 
-      <SectionTitle aside={calib.data && <span className="text-[12px] text-muted">validation subjects {calib.data.model.split.val.join(", ")} · n = {Object.values(calib.data.modalities)[0]?.n_val} windows</span>}>
-        Frozen calibration (clean validation)
+      <SectionTitle
+        aside={
+          calib.data && (
+            <span className="text-[12px] text-muted">
+              {pooled
+                ? `reference: ${calib.data.model.split.train.length + calib.data.model.split.val.length} non-test subjects · n = ${(Object.values(calib.data.modalities)[0] as any)?.n_ref} windows`
+                : `reference: validation subjects ${calib.data.model.split.val.join(", ")} · n = ${Object.values(calib.data.modalities)[0]?.n_val} windows`}
+            </span>
+          )
+        }
+      >
+        Frozen calibration (clean, non-test data only)
       </SectionTitle>
       {calib.isError && <ErrorNote error={calib.error} />}
       <div className="grid gap-4 md:grid-cols-2">

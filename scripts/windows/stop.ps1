@@ -9,7 +9,7 @@ Write-Banner "stop"
 
 if ((Test-Command "docker") -and (Test-DockerUp)) {
     Step "Stopping TrustFuse containers"
-    $null = Invoke-Compose down --remove-orphans --volumes
+    $null = Invoke-Compose @("down", "--remove-orphans", "--volumes")
     $left = & docker ps -a --filter "label=com.docker.compose.project=$($script:Project)" -q
     if ($left) { Warn "some containers are still present: $left" } else { Ok "containers, network and runtime volume removed" }
     if ($Purge) {

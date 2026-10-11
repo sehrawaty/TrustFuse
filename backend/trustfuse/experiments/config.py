@@ -46,12 +46,13 @@ class AttackGrid(BaseModel):
 
 
 class ReliabilitySettings(BaseModel):
-    components: list[Literal["Q", "D", "U"]] = ["Q", "D", "U"]
+    # default operating point: model-free Q with subject-pooled calibration (validation-selected)
+    components: list[Literal["Q", "D", "U"]] = ["Q"]
     mc_samples: int = 8
     alpha: float = 0.05            # target clean false-rejection rate of the low-confidence flag
     gate_span: float = 1.0         # gate closes when anomaly exceeds the threshold by span x (thr - median)
     strategy: Literal["embedding_gate", "poe"] = "embedding_gate"
-    ablations: list[list[Literal["Q", "D", "U"]]] = [["Q"], ["D"], ["U"], ["Q", "D"], ["Q", "U"], ["D", "U"]]
+    ablations: list[list[Literal["Q", "D", "U"]]] = [["Q", "D", "U"], ["Q", "D"], ["Q", "U"], ["D", "U"], ["D"], ["U"]]
 
 
 class StatsSettings(BaseModel):

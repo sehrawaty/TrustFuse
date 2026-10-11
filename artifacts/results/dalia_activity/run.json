@@ -1,0 +1,46 @@
+{
+ "run_id": "dalia_activity",
+ "name": "PPG-DaLiA activity — full LOSO",
+ "description": "Focused PPG/BVP + accelerometer setting from daily-life recordings. Tests whether the suppression vulnerability and the defense transfer to a two-modality wearable.",
+ "task": "dalia_activity",
+ "config_hash": "99192cdf5297",
+ "created": "2026-10-11T12:46:40Z",
+ "seconds": 180.87993955612183,
+ "status": "complete",
+ "trustfuse": "1.0.0",
+ "git_commit": "95b4a92e56a8b6b6b553e11bcdd5114e9a288a3f",
+ "versions": {
+  "python": "3.12.3",
+  "torch": "2.14.1+cpu",
+  "numpy": "2.5.4",
+  "pandas": "3.0.6"
+ },
+ "subjects": [
+  "S1",
+  "S10",
+  "S11",
+  "S12",
+  "S13",
+  "S14",
+  "S15",
+  "S2",
+  "S3",
+  "S4",
+  "S5",
+  "S6",
+  "S7",
+  "S8",
+  "S9"
+ ],
+ "variants": [
+  "fusion",
+  "moddrop",
+  "uni_acc",
+  "uni_bvp"
+ ],
+ "seeds": [
+  0
+ ],
+ "n_rows": 3750,
+ "canonical": true
+}

@@ -88,12 +88,13 @@ function Test-PortFree([int]$Port) {
     }
 }
 
-function Invoke-Compose {
-    param([Parameter(ValueFromRemainingArguments = $true)][string[]]$ComposeArgs)
+# Pass docker arguments as ONE array, e.g. Invoke-Compose @("up", "-d"). (A splatted/remaining-arguments
+# parameter would let PowerShell bind "-d" to its own -Debug common parameter.)
+function Invoke-Compose([string[]]$Arguments) {
     Push-Location $script:RepoRoot
     try {
         # Out-Host keeps docker's output on screen and out of the function's return value
-        & docker compose @ComposeArgs | Out-Host
+        & docker compose $Arguments | Out-Host
         return $LASTEXITCODE
     } finally {
         Pop-Location

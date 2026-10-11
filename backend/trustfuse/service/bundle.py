@@ -17,7 +17,7 @@ from ..models.checkpoint import find_checkpoint, load_checkpoint
 from ..reliability.engine import ReliabilityEngine
 from ..specs import TaskSpec, get_task
 
-CALIB_VERSION = 2
+CALIB_VERSION = 3
 
 
 def release_memory() -> None:
@@ -62,9 +62,11 @@ class FoldBundle:
 def _save_calibration(path: Path, engine: ReliabilityEngine) -> None:
     state = engine.state()
     val_z = state.pop("val_z")
+    q_pool = state.pop("q_pool")
     buf = io.BytesIO()
     np.savez_compressed(buf, meta=np.frombuffer(json.dumps({"version": CALIB_VERSION, **state}).encode(), dtype=np.uint8),
-                        **{f"val_z__{m}": np.asarray(v, dtype=np.float32) for m, v in val_z.items()})
+                        **{f"val_z__{m}": np.asarray(v, dtype=np.float32) for m, v in val_z.items()},
+                        **{f"q_pool__{m}": np.asarray(v, dtype=np.float32) for m, v in q_pool.items()})
     tmp = path.with_suffix(".tmp")
     tmp.write_bytes(buf.getvalue())
     tmp.replace(path)
@@ -77,6 +79,7 @@ def _load_calibration(path: Path) -> dict | None:
             if state.get("version") != CALIB_VERSION:
                 return None
             state["val_z"] = {k.split("__", 1)[1]: z[k] for k in z.files if k.startswith("val_z__")}
+            state["q_pool"] = {k.split("__", 1)[1]: z[k] for k in z.files if k.startswith("q_pool__")}
         return state
     except (OSError, KeyError, ValueError):
         return None

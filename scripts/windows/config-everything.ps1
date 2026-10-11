@@ -79,7 +79,7 @@ if ($problems.Count -gt 0 -and -not $FromRaw) {
 Step "Building Docker images (first run downloads ~1 GB of base layers and PyTorch)"
 $buildArgs = @("build", "--pull")
 if ($NoCache) { $buildArgs += "--no-cache" }
-if ((Invoke-Compose @buildArgs) -ne 0) { Fail "docker compose build failed" }
+if ((Invoke-Compose $buildArgs) -ne 0) { Fail "docker compose build failed" }
 Ok "images built: $($script:Images -join ', ')"
 
 if ($FromRaw) {
@@ -92,7 +92,7 @@ if ($FromRaw) {
 
 if (-not $SkipSmoke) {
     Step "End-to-end smoke test (data checksums, fold models, attacked inference, result sets)"
-    $code = Invoke-Compose run --rm --no-deps api python -m trustfuse smoke
+    $code = Invoke-Compose @("run", "--rm", "--no-deps", "api", "python", "-m", "trustfuse", "smoke")
     if ($code -ne 0) { Fail "smoke test failed (see output above)" }
     Ok "smoke test passed"
 }

@@ -1,0 +1,48 @@
+{
+ "run_id": "wesad_3class",
+ "name": "WESAD 3-class — full LOSO",
+ "description": "Three-class affect recognition (baseline, stress, amusement) with the same models, attack matrix and defense as the headline experiment.",
+ "task": "wesad_3class",
+ "config_hash": "31114a76408a",
+ "created": "2026-10-11T12:43:30Z",
+ "seconds": 172.05842471122742,
+ "status": "complete",
+ "trustfuse": "1.0.0",
+ "git_commit": "95b4a92e56a8b6b6b553e11bcdd5114e9a288a3f",
+ "versions": {
+  "python": "3.12.3",
+  "torch": "2.14.1+cpu",
+  "numpy": "2.5.4",
+  "pandas": "3.0.6"
+ },
+ "subjects": [
+  "S10",
+  "S11",
+  "S13",
+  "S14",
+  "S15",
+  "S16",
+  "S17",
+  "S2",
+  "S3",
+  "S4",
+  "S5",
+  "S6",
+  "S7",
+  "S8",
+  "S9"
+ ],
+ "variants": [
+  "fusion",
+  "moddrop",
+  "uni_acc",
+  "uni_bvp",
+  "uni_eda",
+  "uni_temp"
+ ],
+ "seeds": [
+  0
+ ],
+ "n_rows": 7140,
+ "canonical": true
+}

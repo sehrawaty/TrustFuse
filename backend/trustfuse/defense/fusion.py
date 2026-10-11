@@ -15,11 +15,11 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..reliability.engine import COMPONENTS, Decision, ReliabilityEngine
+from ..reliability.engine import DEFAULT_COMPONENTS, Decision, ReliabilityEngine
 
 
 class ReliabilityAwareFusion:
-    def __init__(self, engine: ReliabilityEngine, components: tuple[str, ...] = COMPONENTS,
+    def __init__(self, engine: ReliabilityEngine, components: tuple[str, ...] = DEFAULT_COMPONENTS,
                  strategy: str = "embedding_gate"):
         self.engine = engine
         self.components = tuple(components)

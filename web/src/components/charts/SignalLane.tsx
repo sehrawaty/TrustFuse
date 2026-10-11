@@ -89,7 +89,7 @@ export default function SignalLane({
         type: "value",
         scale: true,
         splitNumber: 2,
-        axisLabel: { fontSize: 10, color: COLORS.faint, fontFamily: MONO_FONT, formatter: (v: number) => (Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(1)) },
+        axisLabel: { fontSize: 10, color: COLORS.faint, fontFamily: MONO_FONT, formatter: (v: number) => (Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(2)) },
       },
       tooltip: {
         trigger: "axis",

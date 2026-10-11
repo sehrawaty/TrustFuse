@@ -4,8 +4,11 @@ export const pct = (v: number | null | undefined, digits = 1) =>
 export const num = (v: number | null | undefined, digits = 3) =>
   v == null || Number.isNaN(v) ? "—" : v.toFixed(digits);
 
-export const signed = (v: number | null | undefined, digits = 3) =>
-  v == null || Number.isNaN(v) ? "—" : `${v > 0 ? "+" : v < 0 ? "−" : "±"}${Math.abs(v).toFixed(digits)}`;
+export const signed = (v: number | null | undefined, digits = 3) => {
+  if (v == null || Number.isNaN(v)) return "—";
+  if (Math.abs(v) < 0.5 * 10 ** -digits) return (0).toFixed(digits); // no "−0.000"
+  return `${v > 0 ? "+" : "−"}${Math.abs(v).toFixed(digits)}`;
+};
 
 export const pval = (p: number | null | undefined) =>
   p == null || Number.isNaN(p) ? "n/a" : p < 0.001 ? "< 0.001" : p.toFixed(3);

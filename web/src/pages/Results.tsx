@@ -12,6 +12,7 @@ import { pval, signed } from "../lib/format";
 import { BLUE_RAMP, COLORS, MODALITY_COLOR, MODALITY_LABEL } from "../lib/palette";
 
 type M = { mean: number | null; lo: number | null; hi: number | null };
+const fmt2 = (v: number) => (Math.abs(v) < 0.005 ? "0.00" : v.toFixed(2));
 const mm = (c: ConditionAgg | undefined, k: string): M => ((c?.[k] as M) ?? { mean: null, lo: null, hi: null });
 const VARIANT_LABEL: Record<string, string> = {
   fusion: "Fixed fusion",
@@ -257,7 +258,7 @@ function VulnerabilityTab({ s, fusion }: { s: Summary; fusion: ConditionAgg[] })
       xAxis: { type: "category", data: sevs.map((v) => `${Math.round(v * 100)}%`), name: "suppressed share", nameLocation: "middle", nameGap: 22, splitArea: { show: false } },
       yAxis: { type: "category", data: mods.map((m) => MODALITY_LABEL[m]), axisLabel: { color: COLORS.ink2 } },
       visualMap: { min: 0, max: Math.max(0.05, ...vals), calculable: false, orient: "vertical", right: 0, top: "middle", itemHeight: 120, inRange: { color: BLUE_RAMP }, textStyle: { fontSize: 10.5, color: COLORS.muted, fontFamily: MONO_FONT }, formatter: (v: number) => v.toFixed(2) },
-      series: [{ type: "heatmap", data, label: { show: true, fontSize: 11, fontFamily: MONO_FONT, formatter: (p: any) => (p.value[2] == null ? "" : p.value[2].toFixed(2)), color: COLORS.ink }, itemStyle: { borderColor: "#fff", borderWidth: 2, borderRadius: 4 } }],
+      series: [{ type: "heatmap", data: data.map((d) => ({ value: d, label: { color: (d[2] ?? 0) > 0.55 * Math.max(0.05, ...vals) ? "#fff" : COLORS.ink } })), label: { show: true, fontSize: 11, fontFamily: MONO_FONT, formatter: (p: any) => (p.value[2] == null ? "" : fmt2(p.value[2])) }, itemStyle: { borderColor: "#fff", borderWidth: 2, borderRadius: 4 } }],
     };
   }, [fusion, fill, metric, pipeline, mods, sevs, clean]);
 
@@ -315,11 +316,24 @@ function SweepCard({ m, fusion, clean, family, fill, title }: { m: string; fusio
     const rows = fusion.filter((c) => c.family === family && c.modality === m && (fill == null || c.fill === fill)).sort((a, b) => (a.severity ?? 0) - (b.severity ?? 0));
     const xs = [0, ...rows.map((r) => r.severity as number)];
     const pts = (k: string) => [mm(clean, k), ...rows.map((r) => mm(r, k))];
+    // CI band drawn as one closed polygon (lo forward, hi backward)
     const band = (k: string, color: string) => {
       const p = pts(k);
+      const ok = xs.map((_, i) => p[i].lo != null && p[i].hi != null);
+      const lo = xs.map((x, i) => [x * 100, p[i].lo as number]).filter((_, i) => ok[i]);
+      const hi = xs.map((x, i) => [x * 100, p[i].hi as number]).filter((_, i) => ok[i]).reverse();
       return [
-        { type: "line", data: xs.map((x, i) => [x * 100, p[i].lo]), lineStyle: { opacity: 0 }, stack: k, symbol: "none", silent: true },
-        { type: "line", data: xs.map((x, i) => [x * 100, (p[i].hi ?? 0) - (p[i].lo ?? 0)]), lineStyle: { opacity: 0 }, areaStyle: { color, opacity: 0.14 }, stack: k, symbol: "none", silent: true },
+        {
+          type: "custom",
+          silent: true,
+          z: 1,
+          data: [0],
+          renderItem: (_: any, api: any) => ({
+            type: "polygon",
+            shape: { points: [...lo, ...hi].map((pt) => api.coord(pt)) },
+            style: { fill: color, opacity: 0.13 },
+          }),
+        },
       ];
     };
     const line = (k: string, name: string, color: string) => ({ type: "line", name, data: xs.map((x, i) => [x * 100, pts(k)[i].mean]), lineStyle: { color, width: 2 }, itemStyle: { color }, symbolSize: 6 });
@@ -379,7 +393,7 @@ function DefenseTab({ s, fusion }: { s: Summary; fusion: ConditionAgg[] }) {
     const cats = ["clean", ...s.modalities.map((m) => MODALITY_LABEL[m])];
     const vals = (k: string) => [mm(clean, k).mean, ...fams.map((c) => mm(c, k).mean)];
     return {
-      grid: { left: 8, right: 12, top: 30, bottom: 22 },
+      grid: { left: 8, right: 12, top: 56, bottom: 22 },
       legend: { top: 0, left: 0 },
       tooltip: { trigger: "axis", valueFormatter: (v: number) => (v == null ? "—" : `${(v * 100).toFixed(1)}%`) },
       xAxis: { type: "category", data: cats },
@@ -489,11 +503,11 @@ function DetectionTab({ s, det, fusion }: { s: Summary; det?: import("../lib/api
       if (c) series.push({ type: "line", name: `${MODALITY_LABEL[m]} · AUROC ${c[1].auroc.toFixed(3)}`, data: c[1].fpr.map((x, i) => [x, c[1].tpr[i]]), symbol: "none", lineStyle: { color: MODALITY_COLOR[m], width: 2 }, itemStyle: { color: MODALITY_COLOR[m] } });
     });
     return {
-      grid: { left: 8, right: 16, top: 30, bottom: 30 },
+      grid: { left: 36, right: 16, top: 34, bottom: 30 },
       legend: { top: 0, left: 0, itemWidth: 12 },
       tooltip: { trigger: "axis", formatter: (ps: any[]) => ps.filter((p) => p.seriesName).map((p) => ttRow(p.color, p.seriesName.split(" ·")[0], `TPR ${(+p.value[1]).toFixed(2)} @ FRR ${(+p.value[0]).toFixed(2)}`)).join("") },
       xAxis: { type: "value", min: 0, max: 1, name: "false-rejection rate (clean windows)", nameLocation: "middle", nameGap: 22 },
-      yAxis: { type: "value", min: 0, max: 1, name: "detection rate" },
+      yAxis: { type: "value", min: 0, max: 1, name: "detection rate", nameLocation: "middle", nameGap: 30 },
       series,
     };
   }, [det, family, s.modalities]);
@@ -515,7 +529,7 @@ function DetectionTab({ s, det, fusion }: { s: Summary; det?: import("../lib/api
       xAxis: { type: "category", data: cols.map((c) => c[1]), position: "top", axisLabel: { color: COLORS.ink2 } },
       yAxis: { type: "category", data: rows.map((r) => r.label), inverse: true, axisLabel: { color: COLORS.ink2 } },
       visualMap: { min: 0.5, max: 1, right: 0, top: "middle", itemHeight: 140, inRange: { color: ["#f2f4f7", ...BLUE_RAMP] }, textStyle: { fontSize: 10.5, color: COLORS.muted }, formatter: (v: number) => v.toFixed(2) },
-      series: [{ type: "heatmap", data, label: { show: true, fontSize: 10.5, fontFamily: MONO_FONT, formatter: (p: any) => (+p.value[2]).toFixed(2), color: COLORS.ink }, itemStyle: { borderColor: "#fff", borderWidth: 2, borderRadius: 3 } }],
+      series: [{ type: "heatmap", data: data.map((d) => ({ value: d, label: { color: d[2] > 0.85 ? "#fff" : COLORS.ink } })), label: { show: true, fontSize: 10.5, fontFamily: MONO_FONT, formatter: (p: any) => fmt2(+p.value[2]) }, itemStyle: { borderColor: "#fff", borderWidth: 2, borderRadius: 3 } }],
     };
   }, [det, s.modalities]);
   return (

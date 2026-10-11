@@ -22,7 +22,7 @@ export default function GuidedDemo() {
     setTask(DEMO.task);
     setSubject(DEMO.task, DEMO.subject);
     setWindow(windowKey(DEMO.task, DEMO.subject), DEMO.window);
-    setComponents(["Q", "D", "U"]);
+    setComponents(["Q"]);
     setVariant("fusion");
   };
 
@@ -52,7 +52,7 @@ export default function GuidedDemo() {
     },
     {
       title: "The reliability engine notices",
-      body: "Signal quality (Q), cross-modal disagreement (D) and predictive uncertainty (U) are ranked against clean validation data. The suppressed stream's reliability collapses, its fusion weight closes, and a low-confidence flag is raised. The same frozen checkpoint now gives the defended decision.",
+      body: "The suppressed stream's signal-quality evidence is ranked against clean data from all other people: its reliability collapses, its fusion weight closes and a low-confidence flag is raised. The same frozen checkpoint now gives the defended decision. Disagreement (D) and uncertainty (U) are shown alongside and can be switched on.",
       route: "/attack",
     },
     {

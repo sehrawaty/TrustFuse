@@ -22,7 +22,7 @@ class InferIn(BaseModel):
     variant: Literal["fusion", "moddrop"] = "fusion"
     seed: int = 0
     attack: AttackIn = Field(default_factory=AttackIn)
-    components: list[Literal["Q", "D", "U"]] = ["Q", "D", "U"]
+    components: list[Literal["Q", "D", "U"]] = ["Q"]
     strategy: Literal["embedding_gate", "poe"] = "embedding_gate"
 
 

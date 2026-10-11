@@ -63,10 +63,10 @@ def fig_severity(summary, conditions, fill="zero"):
             ax.fill_between(np.array(x) * 100, lo, hi, color=color, alpha=0.15, linewidth=0)
             ax.plot(np.array(x) * 100, mean, color=color, marker="o", markersize=3.5, label=label)
         ax.set_title(MOD_LABEL[m], color=INK)
-        ax.set_xlabel("Suppressed share of window (%)")
         ax.set_ylim(0, 1.02)
     axes[0].set_ylabel("Macro-F1")
     axes[0].legend(loc="lower left", fontsize=7.5)
+    fig.supxlabel("Suppressed share of the window (%)", fontsize=8.5, color=INK, y=-0.04)
     fig.suptitle(f"Severity sweep · {fill}-fill masking (subject-bootstrap 95% CI)", fontsize=9.5, color=INK, y=1.04)
     return fig
 

@@ -14,7 +14,10 @@ with the Q anomaly into an anomaly score a_m. The reliability score
 
     R_m = (1 + #{ clean-validation windows with a >= a_m }) / (n + 1)
 
-is a conformal p-value: for clean, exchangeable data P(R_m <= t) <= t. The low-confidence flag
+is a conformal p-value: for clean, exchangeable data P(R_m <= t) <= t. At the default operating
+point (evidence = Q) the reference anomalies come from every non-test subject, which captures the
+between-person variation that a two-subject validation set cannot; evidence sets that include the
+model-based D/U are calibrated on the held-out validation subjects. The low-confidence flag
 fires when min_m R_m <= alpha / M (Bonferroni over modalities), so its clean false-rejection
 rate is bounded by alpha. The fusion weight
 
@@ -40,6 +43,9 @@ from ..specs import TaskSpec
 from .quality import QualityCalibration
 
 COMPONENTS = ("Q", "D", "U")
+# Default operating point, selected in a validation-only cross-subject study (docs/METHODOLOGY.md §6.6):
+# model-free Q with a reference pooled over all non-test subjects.
+DEFAULT_COMPONENTS = ("Q",)
 Z_CLIP = (-3.0, 50.0)
 
 
@@ -66,7 +72,8 @@ class Decision:
     reliability: dict[str, np.ndarray]       # conformal p-values R_m
     weights: dict[str, np.ndarray]
     flag: np.ndarray                         # (B,) low-confidence / suspected suppression
-    components: tuple[str, ...] = field(default=COMPONENTS)
+    components: tuple[str, ...] = field(default=DEFAULT_COMPONENTS)
+    margin: dict[str, np.ndarray] = field(default_factory=dict)   # (a_m - tau_m) / span_m
 
     @property
     def fixed_pred(self) -> np.ndarray:
@@ -80,8 +87,10 @@ class Decision:
         return np.min(np.stack(list(self.reliability.values()), axis=1), axis=1)
 
     def suspicion(self) -> np.ndarray:
-        """Detection score: larger = more suspicious (used for ROC analysis)."""
-        return -np.log(self.min_reliability())
+        """Detection score for ROC analysis: the largest calibrated anomaly margin
+        (a_m - tau_m) / span_m over modalities. Unlike -log R it does not saturate at the
+        conformal floor 1/(n+1), so strongly suppressed windows remain rankable."""
+        return np.max(np.stack(list(self.margin.values()), axis=1), axis=1)
 
 
 def _softmax(logits: torch.Tensor) -> np.ndarray:
@@ -106,6 +115,7 @@ class ReliabilityEngine:
         self.mu: dict[str, np.ndarray] = {}
         self.ref: dict[str, dict[str, float]] = {}     # robust stats of D and U per modality
         self.val_z: dict[str, np.ndarray] = {}         # (n_val, 3) columns Q, zD, zU per modality
+        self.q_pool: dict[str, np.ndarray] = {}        # Q anomalies of the pooled non-test reference
         self._dist_cache: dict[tuple, dict] = {}
         self.calibrated = False
 
@@ -185,6 +195,8 @@ class ReliabilityEngine:
         (defaults to the validation windows)."""
         ref_phys = ref_phys if ref_phys is not None else val_phys
         self.quality = {m: QualityCalibration(m, self.task.model_hz[m]).fit(ref_phys[m]) for m in self.modalities}
+        # model-free Q can be calibrated on every non-test subject -> captures between-person variation
+        self.q_pool = {m: self.quality[m].anomaly(ref_phys[m])[0].astype(np.float32) for m in self.modalities}
         outs = self.outputs(val_phys)
         d = self.disagreement(outs)
         for m in self.modalities:
@@ -207,7 +219,10 @@ class ReliabilityEngine:
             q = 1.0 - self.alpha / len(self.modalities)
             dist = {}
             for m in self.modalities:
-                a = np.sort(self.val_z[m][:, cols].sum(axis=1))
+                if key == ("Q",):
+                    a = np.sort(self.q_pool[m]).astype(np.float32)   # subject-diverse reference (all non-test subjects)
+                else:
+                    a = np.sort(self.val_z[m][:, cols].sum(axis=1)).astype(np.float32)   # held-out validation subjects
                 n = a.size
                 k = min(n - 1, int(math.ceil((n + 1) * q)) - 1)   # conformal (1 - alpha/M) quantile
                 tau = float(a[k])
@@ -217,31 +232,33 @@ class ReliabilityEngine:
         return self._dist_cache[key]
 
     # -- scoring + reliability-aware fusion ----------------------------------------------------
-    def score(self, outs: dict[str, ModalityOutput], components: tuple[str, ...] = COMPONENTS):
+    def score(self, outs: dict[str, ModalityOutput], components: tuple[str, ...] = DEFAULT_COMPONENTS):
         if not self.calibrated:
             raise RuntimeError("engine is not calibrated")
         dist = self._distribution(components)
         d = self.disagreement(outs)
-        evidence, anomaly, rel, weights = {}, {}, {}, {}
+        evidence, anomaly, rel, weights, margin = {}, {}, {}, {}, {}
         for m in self.modalities:
             zd, zu = self._z(m, d[m], outs[m].u)
             parts = {"Q": outs[m].q, "D": zd, "U": zu}
             a = np.sum([parts[c] for c in components], axis=0) if components else np.zeros_like(zd)
             ref = dist[m]
             n = ref["sorted"].size
-            n_ge = n - np.searchsorted(ref["sorted"], a, side="left")
+            # compare in the reference's float32 so exact ties count as ties (keeps R conservative)
+            n_ge = n - np.searchsorted(ref["sorted"], a.astype(ref["sorted"].dtype), side="left")
             rel[m] = (1.0 + n_ge) / (n + 1.0)
-            weights[m] = np.clip(1.0 - (a - ref["tau"]) / ref["span"], 0.0, 1.0)
+            margin[m] = (a - ref["tau"]) / ref["span"]
+            weights[m] = np.clip(1.0 - margin[m], 0.0, 1.0)
             anomaly[m] = a
             evidence[m] = {"Q": outs[m].q, "D": d[m], "U": outs[m].u, "zD": zd, "zU": zu}
         min_r = np.min(np.stack(list(rel.values()), axis=1), axis=1)
         flag = min_r <= self.alpha / len(self.modalities)
-        return evidence, anomaly, rel, weights, flag
+        return evidence, anomaly, rel, weights, flag, margin
 
     @torch.no_grad()
-    def decide(self, outs: dict[str, ModalityOutput], components: tuple[str, ...] = COMPONENTS,
+    def decide(self, outs: dict[str, ModalityOutput], components: tuple[str, ...] = DEFAULT_COMPONENTS,
                strategy: str = "embedding_gate") -> Decision:
-        evidence, anomaly, rel, weights, flag = self.score(outs, components)
+        evidence, anomaly, rel, weights, flag, margin = self.score(outs, components)
         h = {m: torch.from_numpy(outs[m].h) for m in self.modalities}
         fixed = _softmax(self.model.classify(self.model.fuse(h)))
         if strategy == "poe":
@@ -255,7 +272,7 @@ class ReliabilityEngine:
         return Decision(fixed_probs=fixed, defended_probs=defended,
                         aux_probs={m: outs[m].aux for m in self.modalities}, evidence=evidence,
                         anomaly=anomaly, reliability=rel, weights=weights, flag=flag,
-                        components=tuple(components))
+                        components=tuple(components), margin=margin)
 
     def run(self, phys: dict[str, np.ndarray], **kw) -> Decision:
         return self.decide(self.outputs(phys), **kw)
@@ -268,6 +285,7 @@ class ReliabilityEngine:
             "mu": {m: v.tolist() for m, v in self.mu.items()},
             "ref": self.ref,
             "val_z": {m: v.tolist() for m, v in self.val_z.items()},
+            "q_pool": {m: v.tolist() for m, v in self.q_pool.items()},
         }
 
     def load_state(self, s: dict) -> "ReliabilityEngine":
@@ -278,21 +296,30 @@ class ReliabilityEngine:
         self.mu = {m: np.asarray(v, dtype=np.float32) for m, v in s["mu"].items()}
         self.ref = s["ref"]
         self.val_z = {m: np.asarray(v, dtype=np.float32) for m, v in s["val_z"].items()}
+        self.q_pool = {m: np.asarray(v, dtype=np.float32) for m, v in s["q_pool"].items()}
         self._dist_cache.clear()
         self.calibrated = True
         return self
 
-    def calibration_summary(self, components: tuple[str, ...] = COMPONENTS) -> dict:
+    def _hist_source(self, m: str, c: str, i: int) -> np.ndarray:
+        """Q: the pooled non-test reference (clipped at its 99.5th percentile for display);
+        D, U: the validation z-scores."""
+        if c == "Q" and self.q_pool:
+            q = self.q_pool[m]
+            return np.clip(q, None, np.percentile(q, 99.5))
+        return self.val_z[m][:, i]
+
+    def calibration_summary(self, components: tuple[str, ...] = DEFAULT_COMPONENTS) -> dict:
         dist = self._distribution(components)
         out = {}
         for m in self.modalities:
             v = self.val_z[m]
             out[m] = {
                 "tau": dist[m]["tau"], "median": dist[m]["median"], "span": dist[m]["span"],
-                "n_val": int(v.shape[0]),
+                "n_val": int(v.shape[0]), "n_ref": int(dist[m]["sorted"].size),
                 "anomaly_quantiles": np.quantile(dist[m]["sorted"], [0.05, 0.25, 0.5, 0.75, 0.95, 0.99]).tolist(),
                 "quality": self.quality[m].to_dict(), "ref": self.ref[m],
-                "hist": {c: np.histogram(v[:, i], bins=30)[0].tolist() for i, c in enumerate(COMPONENTS)},
-                "hist_edges": {c: np.histogram(v[:, i], bins=30)[1].tolist() for i, c in enumerate(COMPONENTS)},
+                "hist": {c: np.histogram(self._hist_source(m, c, i), bins=30)[0].tolist() for i, c in enumerate(COMPONENTS)},
+                "hist_edges": {c: np.histogram(self._hist_source(m, c, i), bins=30)[1].tolist() for i, c in enumerate(COMPONENTS)},
             }
         return out

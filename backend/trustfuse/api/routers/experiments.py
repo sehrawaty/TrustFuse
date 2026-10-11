@@ -19,9 +19,9 @@ router = APIRouter(tags=["experiments"])
 # Presets offered in the UI. "Evaluate frozen checkpoints" re-runs the attack matrix on the shipped
 # models without retraining; user runs never overwrite the shipped canonical results.
 PRESETS = {
-    "quick_demo": {"file": "quick_demo.yaml", "label": "Quick demo", "minutes": 4,
+    "quick_demo": {"file": "quick_demo.yaml", "label": "Quick demo", "minutes": 2,
                    "summary": "Train a fusion model for one held-out subject and run a compact attack matrix."},
-    "evaluate_frozen": {"file": "wesad_binary.yaml", "label": "Evaluate frozen checkpoints", "minutes": 6,
+    "evaluate_frozen": {"file": "wesad_binary.yaml", "label": "Evaluate frozen checkpoints", "minutes": 2,
                         "summary": "Re-run the attack matrix on shipped LOSO models for selected subjects.",
                         "overrides": {"name": "Frozen checkpoints — re-evaluation", "test_subjects": ["S2", "S3", "S4"],
                                       "variants": ["fusion"], "seeds": [0], "eval_seeds": [0], "models_root": "artifacts",

@@ -5,6 +5,7 @@
     train     train every model of one or more experiment configs (resumable)
     evaluate  calibrate + attack grid + statistics for a config (writes a result set)
     run       train then evaluate (what the API's job worker executes)
+    report    regenerate docs/RESULTS.md and docs/figures from the canonical result sets
     smoke     end-to-end self test used by config-everything
     serve     start the API server
 """
@@ -79,6 +80,12 @@ def cmd_run(args) -> int:
     return 0
 
 
+def cmd_report(_args) -> int:
+    from .evaluation.report_md import write_results_md
+    print(f"wrote {write_results_md()}")
+    return 0
+
+
 def cmd_smoke(_args) -> int:
     from .service.smoke import run_smoke
     t0 = time.time()
@@ -108,6 +115,7 @@ def main(argv: list[str] | None = None) -> int:
         p.add_argument("--workers", type=int, default=1)
         p.add_argument("--run-id", default=None)
         p.set_defaults(fn=fn)
+    sub.add_parser("report").set_defaults(fn=cmd_report)
     sub.add_parser("smoke").set_defaults(fn=cmd_smoke)
     p = sub.add_parser("serve")
     p.add_argument("--host", default="0.0.0.0")

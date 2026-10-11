@@ -16,7 +16,7 @@ from ..attacks.simulator import AttackSimulator, AttackSpec
 from ..data.loader import DatasetLoader
 from ..data.preprocess import Preprocessor, load_stream
 from ..models.checkpoint import find_checkpoint
-from ..reliability.engine import COMPONENTS, Decision, ModalityOutput
+from ..reliability.engine import DEFAULT_COMPONENTS, Decision, ModalityOutput
 from ..specs import DATASETS, LABEL_HZ, MODALITY_SPECS, TASKS, get_task
 from .bundle import BundleCache, FoldBundle
 
@@ -171,7 +171,7 @@ class InferenceService:
 
         b = self.bundle(task_key, subject, variant, seed)
         eng = b.engine
-        comps = tuple(components) if components is not None else COMPONENTS
+        comps = tuple(components) if components else DEFAULT_COMPONENTS
         t = time.perf_counter()   # time the pipeline itself, not the one-off model load
         phys, y, start = self._window_phys(task_key, subject, index)
         step("Send synchronized window")
@@ -342,7 +342,7 @@ class InferenceService:
     def calibration(self, task_key: str, subject: str, variant: str = "fusion", seed: int = 0,
                     components: list[str] | None = None) -> dict:
         b = self.bundle(task_key, subject, variant, seed)
-        comps = tuple(components) if components else COMPONENTS
+        comps = tuple(components) if components else DEFAULT_COMPONENTS
         return {"subject": subject, "components": list(comps), "alpha": b.engine.alpha,
                 "flag_threshold": b.engine.alpha / len(b.task.modalities),
                 "modalities": b.engine.calibration_summary(comps), "model": b.meta()}
@@ -360,4 +360,5 @@ def _patch(clean: Decision, part: Decision, idx: np.ndarray) -> Decision:
         anomaly={m: put(clean.anomaly[m], part.anomaly[m]) for m in clean.anomaly},
         reliability={m: put(clean.reliability[m], part.reliability[m]) for m in clean.reliability},
         weights={m: put(clean.weights[m], part.weights[m]) for m in clean.weights},
-        flag=put(clean.flag, part.flag), components=clean.components)
+        flag=put(clean.flag, part.flag), components=clean.components,
+        margin={m: put(clean.margin[m], part.margin[m]) for m in clean.margin})

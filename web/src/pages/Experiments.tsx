@@ -113,7 +113,7 @@ export default function Experiments() {
         <div className="col-span-12 space-y-4 xl:col-span-7">
           {shown ? <JobMonitor id={shown} /> : <Card><Empty title="No experiment has been run in this session" icon={<FlaskConical className="h-6 w-6" />}>Launch the quick demo to watch training, calibration and the attack matrix run live.</Empty></Card>}
           <Card>
-            <CardHeader eyebrow="History" title="Runs in this session" sub="`.\\run` starts a fresh session, so user runs are cleared while shipped results stay." />
+            <CardHeader eyebrow="History" title="Runs in this session" sub={"Each .\\run starts a fresh session: user runs are cleared, shipped results stay."} />
             {jobs.data?.length ? (
               <table className="w-full text-[12.5px]">
                 <tbody>
@@ -211,7 +211,7 @@ function ConfigEditor({ cfg, preset, dataset, onChange }: { cfg: any; preset: Pr
         </div>
       </Field>
       <div className="grid grid-cols-2 gap-4">
-        <Field label="Flag level α" hint="Target clean false-rejection rate of the low-confidence flag.">
+        <Field label="Flag level (alpha)" hint="Target clean false-rejection rate of the low-confidence flag.">
           <Segmented size="sm" value={cfg.reliability.alpha} onChange={(v) => onChange({ reliability: { alpha: v } })} options={[0.01, 0.05, 0.1].map((v) => ({ value: v, label: String(v) }))} />
         </Field>
         <Field label="Evidence">

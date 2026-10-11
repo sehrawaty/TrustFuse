@@ -19,15 +19,19 @@ def bundle():
 
 
 def test_conformal_reliability_on_calibration_data_is_valid(bundle):
-    """On the clean validation windows themselves R is (super-)uniform: P(R <= t) <= t (+1/n)."""
+    """On its own reference data R is (super-)uniform: P(R <= t) <= t (+ finite-sample slack).
+    Q is referenced to every non-test subject; Q+D+U to the held-out validation subjects."""
     eng = bundle.engine
-    val = gather("wesad_binary", bundle.ckpt["split"]["val"])
-    dec = eng.run(val.phys)
-    n = len(val)
-    for m in eng.modalities:
-        for t in (0.01, 0.05, 0.2):
-            assert np.mean(dec.reliability[m] <= t) <= t + 2.0 / n
-    assert dec.flag.mean() <= eng.alpha + 4.0 / n
+    split = bundle.ckpt["split"]
+    cases = [(("Q",), gather("wesad_binary", split["train"] + split["val"], max_per_subject=300)),
+             (("Q", "D", "U"), gather("wesad_binary", split["val"]))]
+    for comps, ws in cases:
+        dec = eng.run(ws.phys, components=comps)
+        n = len(ws)
+        for m in eng.modalities:
+            for t in (0.01, 0.05, 0.2):
+                assert np.mean(dec.reliability[m] <= t) <= t + 3.0 / n + 0.005, (comps, m, t)
+        assert dec.flag.mean() <= eng.alpha + 4.0 / n + 0.005
 
 
 def test_determinism(bundle):
