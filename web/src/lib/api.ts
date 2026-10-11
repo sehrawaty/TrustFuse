@@ -154,6 +154,7 @@ export interface InferResult {
   flag_threshold: number;
   alpha: number;
   components: string[];
+  calibration: "validation" | "pooled";
   strategy: string;
   model: { split: { train: string[]; val: string[]; test: string[] }; val_f1: number; epochs: number; created: string; config_hash: string };
   trace: { step: number; label: string; ms: number }[];
@@ -220,6 +221,7 @@ export interface Timeline {
 export interface Calibration {
   subject: string;
   components: string[];
+  calibration: "validation" | "pooled";
   alpha: number;
   flag_threshold: number;
   modalities: Record<
@@ -229,6 +231,7 @@ export interface Calibration {
       median: number;
       span: number;
       n_val: number;
+      n_ref: number;
       anomaly_quantiles: number[];
       quality: { names: string[]; median: number[]; scale: number[]; bounds: number[] | null };
       ref: Record<string, number>;
@@ -252,6 +255,7 @@ export interface ConditionAgg {
   scope: string | null;
   components: string | null;
   strategy: string | null;
+  calibration?: string | null;
   n_subjects: number;
   seed_sd?: { fixed_f1: number | null; def_f1: number | null };
   [metric: string]: unknown;
@@ -289,6 +293,25 @@ export interface Summary {
   moddrop_comparison: { family: string; fusion_fixed: CI; fusion_defended: CI; moddrop_fixed: CI; moddrop_defended: CI }[] | null;
   forest: { modality: string; subject: string; fixed_f1: number; def_f1: number; gain: number }[];
   svi: Record<string, number>;
+  defense?: { components: string[]; calibration: string; strategy: string; alpha: number };
+  operating_points?: OperatingPoint[];
+}
+
+/** The primary defense or one ablation of it, on clean windows and under full suppression of each modality. */
+export interface OperatingPoint {
+  components: string;
+  strategy: string;
+  calibration: string;
+  primary: boolean;
+  clean_frr: CI;
+  clean_fixed_f1: CI;
+  clean_def_f1: CI;
+  full_fixed_f1: CI;
+  full_def_f1: CI;
+  full_gain: CI;
+  full_flag_rate: CI;
+  full_auroc: CI;
+  per_modality: Record<string, { fixed_f1: CI; def_f1: CI }>;
 }
 
 export interface Detection {
@@ -385,13 +408,14 @@ export const api = {
     request<{ history: { epoch: number; loss: number; val_f1: number; val_acc: number }[]; val_f1: number; split: any; parameters: number; bytes: number; created: string; train_cfg: any }>(
       `/models/${task}/${variant}/${seed}/${subject}`,
     ),
-  infer: (body: { task: string; subject: string; window: number; variant?: string; attack: Attack; components?: string[]; strategy?: string }) =>
+  infer: (body: { task: string; subject: string; window: number; variant?: string; attack: Attack; components?: string[]; calibration?: string; strategy?: string }) =>
     post<InferResult>("/infer", body),
   targeted: (body: { task: string; subject: string; window: number; fill: Fill; variant?: string }) => post<TargetedResult>("/attack/targeted", body),
   adaptive: (body: { task: string; subject: string; window: number; variant?: string }) => post<AdaptiveResult>("/attack/adaptive", body),
   timeline: (body: { task: string; subject: string; variant?: string; burst?: { modality: string; start_index: number; length: number; fill: Fill } | null }) =>
     post<Timeline>("/timeline", body),
-  calibration: (task: string, subject: string, components = "QDU") => request<Calibration>(`/calibration/${task}/${subject}?components=${components}`),
+  calibration: (task: string, subject: string, components = "QDU", calibration = "validation") =>
+    request<Calibration>(`/calibration/${task}/${subject}?components=${components}&calibration=${calibration}`),
   results: () => request<RunMeta[]>("/results"),
   summary: (run: string) => request<Summary>(`/results/${run}/summary`),
   conditions: (run: string) => request<{ run_id: string; task: string; conditions: ConditionAgg[] }>(`/results/${run}/conditions`),

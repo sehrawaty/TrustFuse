@@ -32,7 +32,7 @@ const TYPE_HELP: Record<string, string> = {
 };
 
 export default function AttackLab() {
-  const { task, subject: subjMap, setSubject, window: winMap, setWindow, attack, setAttack, variant, setVariant, components, toggleComponent } = useApp();
+  const { task, subject: subjMap, setSubject, window: winMap, setWindow, attack, setAttack, variant, setVariant, components, toggleComponent, calibration, setCalibration } = useApp();
   const overview = useQuery({ queryKey: ["overview"], queryFn: api.overview });
   const taskInfo = overview.data?.tasks.find((t) => t.key === task);
   const subjects = useQuery({ queryKey: ["subjects", task], queryFn: () => api.subjects(task) });
@@ -43,11 +43,11 @@ export default function AttackLab() {
   const win = Math.min(winMap[key] ?? defaultWindow(windows.data), Math.max(nWin - 1, 0));
   const mods = taskInfo?.modalities ?? ["bvp", "acc", "eda", "temp"];
 
-  const debounced = useDebounced({ attack, win, components: components.join(""), variant });
+  const debounced = useDebounced({ attack, win, components: components.join(""), variant, calibration });
   const infer = useQuery({
     queryKey: ["infer", task, subject, debounced],
     queryFn: () =>
-      api.infer({ task, subject, window: debounced.win, variant: debounced.variant, attack: debounced.attack, components: debounced.components.split("") }),
+      api.infer({ task, subject, window: debounced.win, variant: debounced.variant, attack: debounced.attack, components: debounced.components.split(""), calibration: debounced.calibration }),
     enabled: !!windows.data && nWin > 0,
     placeholderData: keepPreviousData,
   });
@@ -238,7 +238,7 @@ export default function AttackLab() {
             )}
             <div>
               <div className="eyebrow mb-2 flex items-center gap-1">
-                Reliability evidence <InfoTip>Default: model-free signal quality Q, calibrated on all non-test people (validated to transfer across people). Add disagreement D or uncertainty U to see their effect; those subsets are calibrated on the held-out validation subjects.</InfoTip>
+                Reliability evidence <InfoTip>Default (report design): signal quality Q, cross-modal disagreement D and predictive uncertainty U are combined into the reliability score. Switch a channel off to see its contribution; the reference distribution is recomputed for the remaining sum.</InfoTip>
               </div>
               <div className="flex gap-2">
                 {["Q", "D", "U"].map((c) => (
@@ -254,6 +254,17 @@ export default function AttackLab() {
                   </button>
                 ))}
               </div>
+              <div className="eyebrow mb-2 mt-4 flex items-center gap-1">
+                Calibration reference <InfoTip>Validation (report design): every scaling parameter and threshold comes from the clean validation subjects of this fold. Pooled (extension): the signal-quality reference pools all non-test subjects, which lowers false alarms on new people.</InfoTip>
+              </div>
+              <Segmented
+                value={calibration}
+                onChange={setCalibration}
+                options={[
+                  { value: "validation", label: "Validation", title: "Report design: validation subjects only" },
+                  { value: "pooled", label: "Pooled", title: "Extension: signal-quality reference pooled over all non-test subjects" },
+                ]}
+              />
             </div>
             <div className="space-y-2 border-t border-line pt-4">
               <div className="eyebrow">Attacker strategies</div>

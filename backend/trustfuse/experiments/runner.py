@@ -2,20 +2,22 @@
 
 A result set is a directory ``<results root>/<run_id>/`` with:
 
-    run.json          provenance (config hash, versions, timing, git commit, status)
+    run.json          provenance (config hash, versions, timing, git commit + dirty flag, code hash, status)
     config.yaml       the exact experiment configuration
     rows.csv.gz       one row per variant x seed x subject x condition (raw measurements)
     subjects.csv.gz   seed-averaged subject-level table (unit of statistical analysis)
     conditions.json   per variant/condition aggregates with subject-bootstrap 95% CIs (UI)
-    summary.json      baselines, hypotheses H1-H4, secondary analyses, headline numbers
+    summary.json      baselines, hypotheses H1-H4, secondary analyses, evidence/calibration ablations
     detection.json    pooled ROC curves and the detectability matrix
-    manifest.npz      traceable per-window decisions for every attacked window (manifest seed)
+    manifest.npz      traceable per-window decisions for every window-level attack (manifest seed)
+    bursts.csv.gz     traceable per-window decisions for every burst-affected window (manifest seed)
     calibration.json  frozen reliability calibration of every fold (primary model)
 """
 
 from __future__ import annotations
 
 import gzip
+import hashlib
 import json
 import os
 import platform
@@ -42,19 +44,46 @@ KEY_METRICS = ("fixed_f1", "def_f1", "fixed_acc", "def_acc", "fixed_bacc", "def_
                "fixed_asr", "def_asr", "fixed_conf", "def_conf", "fixed_ptrue", "def_ptrue", "fixed_cwrong",
                "def_cwrong", "fixed_ece", "def_ece", "flag_rate", "sel_acc", "coverage", "evasive_def_flip",
                "auroc", "auroc_Q", "auroc_D", "auroc_U", "r_target", "w_target", "latency_s", "detected_bursts")
-META = ("cond", "family", "attack", "modality", "fill", "severity", "snr_db", "burst", "scope", "components", "strategy")
+META = ("cond", "family", "attack", "modality", "fill", "severity", "snr_db", "burst", "scope", "components",
+        "strategy", "calibration")
 
 
 def results_root(cfg: ExperimentConfig) -> Path:
     return paths.ARTIFACTS_DIR / "results" if cfg.results_root == "artifacts" else paths.RUNTIME_DIR / "results"
 
 
-def _git_commit() -> str | None:
+def _git(*args: str) -> str | None:
     try:
-        return subprocess.run(["git", "rev-parse", "HEAD"], cwd=paths.REPO_ROOT, capture_output=True, text=True,
-                              timeout=5).stdout.strip() or None
+        r = subprocess.run(["git", *args], cwd=paths.REPO_ROOT, capture_output=True, text=True, timeout=10)
+        return r.stdout.strip() if r.returncode == 0 else None
     except (OSError, subprocess.SubprocessError):
         return None
+
+
+def _git_commit() -> str | None:
+    """Commit of the checkout. Inside the Docker image there is no git, so the launcher may pass
+    the host's values through TRUSTFUSE_GIT_COMMIT / TRUSTFUSE_GIT_DIRTY."""
+    return _git("rev-parse", "HEAD") or os.environ.get("TRUSTFUSE_GIT_COMMIT") or None
+
+
+def _git_dirty() -> bool | None:
+    """True when tracked source files differ from the recorded commit (None when unknown).
+    The code hash below identifies the code in either case."""
+    status = _git("status", "--porcelain", "--untracked-files=no", "--", "backend", "configs")
+    if status is not None:
+        return bool(status)
+    env = os.environ.get("TRUSTFUSE_GIT_DIRTY")
+    return None if env is None else env.strip().lower() in ("1", "true", "yes")
+
+
+def code_sha256() -> str:
+    """Hash of the trustfuse package sources that produced a result set, independent of git."""
+    root = Path(__file__).resolve().parents[1]
+    h = hashlib.sha256()
+    for p in sorted(root.rglob("*.py")):
+        h.update(p.relative_to(root).as_posix().encode())
+        h.update(p.read_bytes().replace(b"\r\n", b"\n"))
+    return h.hexdigest()
 
 
 def eval_jobs(cfg: ExperimentConfig) -> list[tuple[str, int, str]]:
@@ -80,17 +109,19 @@ def run_eval_job(cfg: ExperimentConfig, variant: str, seed: int, subject: str,
     if bundle.engine is not None:
         bundle.engine.alpha = cfg.reliability.alpha
         bundle.engine.gate_span = cfg.reliability.gate_span
+        bundle.engine.calibration = cfg.reliability.calibration
         bundle.engine._dist_cache.clear()
     ev = Evaluator(bundle, cfg, log=log, should_stop=should_stop)
     if bundle.is_fusion:
         res = ev.evaluate(with_manifest=(variant == "fusion" and seed == cfg.manifest_seed))
-        calib = bundle.engine.calibration_summary(tuple(cfg.reliability.components)) \
+        calib = bundle.engine.calibration_summary(tuple(cfg.reliability.components), cfg.reliability.calibration) \
             if variant == "fusion" and seed == cfg.manifest_seed else None
     else:
         res = ev.evaluate_unimodal()
         calib = None
     return {"variant": variant, "seed": seed, "subject": subject, "rows": res.rows, "manifest": res.manifest,
-            "windows": res.windows, "scores": res.scores, "calibration": calib, "seconds": time.time() - t0}
+            "windows": res.windows, "scores": res.scores, "bursts": res.bursts, "calibration": calib,
+            "seconds": time.time() - t0}
 
 
 def _eval_worker(args) -> dict:
@@ -152,6 +183,58 @@ def evaluate_experiment(cfg: ExperimentConfig, workers: int = 1, log: Callable[[
 
 
 # ------------------------------------------------------------------------------------------
+def operating_points(primary: pd.DataFrame, cfg: ExperimentConfig, modalities: tuple[str, ...], boot: dict) -> list[dict]:
+    """The primary defense next to every ablation (evidence subsets, fusion strategy, calibration
+    scheme) on the same conditions: clean windows and full suppression of each modality."""
+    S, R = cfg.stats, cfg.reliability
+
+    def per_subject(df: pd.DataFrame, col: str) -> np.ndarray:
+        return df.groupby("subject")[col].mean().to_numpy(float)
+
+    def entry(label: dict, clean_rows: pd.DataFrame, full_rows: pd.DataFrame) -> dict | None:
+        if clean_rows.empty or full_rows.empty:
+            return None
+        gain = full_rows.assign(gain=full_rows.def_f1 - full_rows.fixed_f1)
+        e = {**label,
+             "clean_frr": bootstrap_ci(per_subject(clean_rows, "flag_rate"), **boot),
+             "clean_fixed_f1": bootstrap_ci(per_subject(clean_rows, "fixed_f1"), **boot),
+             "clean_def_f1": bootstrap_ci(per_subject(clean_rows, "def_f1"), **boot),
+             "full_fixed_f1": bootstrap_ci(per_subject(full_rows, "fixed_f1"), **boot),
+             "full_def_f1": bootstrap_ci(per_subject(full_rows, "def_f1"), **boot),
+             "full_gain": bootstrap_ci(per_subject(gain, "gain"), **boot),
+             "full_flag_rate": bootstrap_ci(per_subject(full_rows, "flag_rate"), **boot),
+             "full_auroc": bootstrap_ci(per_subject(full_rows, "auroc"), **boot),
+             "per_modality": {}}
+        for m in modalities:
+            fm = full_rows[full_rows.modality == m]
+            if len(fm):
+                e["per_modality"][m] = {"fixed_f1": bootstrap_ci(fm.fixed_f1.to_numpy(float), **boot),
+                                        "def_f1": bootstrap_ci(fm.def_f1.to_numpy(float), **boot)}
+        return e
+
+    out = []
+    full = primary[(primary.family == "mask") & (primary.fill == S.primary_fill)
+                   & np.isclose(primary.severity.astype(float), S.primary_severity)]
+    first = entry({"components": "".join(R.components), "strategy": R.strategy, "calibration": R.calibration,
+                   "primary": True}, primary[primary.family == "clean"], full)
+    if first:
+        out.append(first)
+    abl = primary[primary.family == "ablation"]
+    rest = []
+    if len(abl):
+        for (comp, strat, cal), g in abl.groupby(["components", "strategy", "calibration"], sort=False):
+            e = entry({"components": comp, "strategy": strat, "calibration": cal, "primary": False},
+                      g[g.attack == "none"], g[(g.attack == "mask") & (g.fill == S.primary_fill)])
+            if e:
+                rest.append(e)
+    # primary first, then evidence subsets under the primary calibration (larger sets first), then the
+    # alternative fusion strategy, then the other calibration scheme
+    order = ["QDU", "QD", "QU", "DU", "Q", "D", "U"]
+    rest.sort(key=lambda e: (e["calibration"] != R.calibration, e["strategy"] != R.strategy,
+                             order.index(e["components"]) if e["components"] in order else len(order)))
+    return out + rest
+
+
 def aggregate(cfg: ExperimentConfig, results: list[dict], out: Path, run_id: str, seconds: float,
               log: Callable[[str], None] = print) -> None:
     task = get_task(cfg.task)
@@ -227,12 +310,16 @@ def aggregate(cfg: ExperimentConfig, results: list[dict], out: Path, run_id: str
             forest.append({"modality": m, "subject": r.subject, "fixed_f1": r.fixed_f1, "def_f1": r.def_f1,
                            "gain": r.def_f1 - r.fixed_f1})
 
+    R = cfg.reliability
     summary = {
         "run_id": run_id, "task": cfg.task, "title": task.title, "classes": list(task.classes),
         "modalities": list(task.modalities), "n_subjects": int(subj.subject.nunique()),
         "n_windows": int(clean[clean.variant == "fusion"].n.sum()) if len(clean) else 0,
+        "defense": {"components": list(R.components), "calibration": R.calibration, "strategy": R.strategy,
+                    "alpha": R.alpha},
         "baselines": baselines, "hypotheses": hyp, "moddrop_comparison": moddrop_cmp, "forest": forest,
         "svi": {r["modality"]: r["svi"] for r in hyp["H2"]["ranking"]},
+        "operating_points": operating_points(primary, cfg, task.modalities, boot),
     }
     write_json(out / "summary.json", summary)
 
@@ -281,6 +368,21 @@ def aggregate(cfg: ExperimentConfig, results: list[dict], out: Path, run_id: str
                             start_s=np.concatenate(meta_cols["start_s"]), y=np.concatenate(meta_cols["y"]),
                             **{f"c{i}": man[k] for i, k in enumerate(keys) if k in man})
 
+    # burst traceability: one row per burst-affected window (target modality, burst length, placement,
+    # suppressed interval and both decisions)
+    burst_frames = []
+    for r in sorted([r for r in results if r.get("bursts")], key=lambda r: r["subject"]):
+        frame = pd.DataFrame(r["bursts"])
+        frame.insert(0, "subject", r["subject"])
+        burst_frames.append(frame)
+    if burst_frames:
+        bursts = pd.concat(burst_frames, ignore_index=True)
+        for c in ("fixed_conf", "def_conf", "w_target"):
+            bursts[c] = bursts[c].round(4)
+        bursts["r_target"] = bursts["r_target"].round(5)
+        with gzip.open(out / "bursts.csv.gz", "wt") as f:
+            bursts.to_csv(f, index=False)
+
     write_json(out / "calibration.json", {r["subject"]: r["calibration"] for r in results if r["calibration"]})
     (out / "config.yaml").write_text(cfg.to_yaml())
     import torch
@@ -288,6 +390,8 @@ def aggregate(cfg: ExperimentConfig, results: list[dict], out: Path, run_id: str
         "run_id": run_id, "name": cfg.name, "description": cfg.description, "task": cfg.task,
         "config_hash": cfg.config_hash(), "created": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "seconds": seconds, "status": "complete", "trustfuse": __version__, "git_commit": _git_commit(),
+        "git_dirty": _git_dirty(), "code_sha256": code_sha256(),
+        "defense": {"components": list(R.components), "calibration": R.calibration, "strategy": R.strategy},
         "versions": {"python": platform.python_version(), "torch": torch.__version__, "numpy": np.__version__,
                      "pandas": pd.__version__},
         "subjects": sorted(subj.subject.unique().tolist()), "variants": sorted(subj.variant.unique().tolist()),

@@ -15,14 +15,15 @@ interface Step {
 
 /** Presentation mode: a scripted walk-through that drives the real application state. */
 export default function GuidedDemo() {
-  const { demoStep, setDemoStep, setTask, setSubject, setWindow, setAttack, setComponents, setVariant } = useApp();
+  const { demoStep, setDemoStep, setTask, setSubject, setWindow, setAttack, setComponents, setCalibration, setVariant } = useApp();
   const navigate = useNavigate();
 
   const base = () => {
     setTask(DEMO.task);
     setSubject(DEMO.task, DEMO.subject);
     setWindow(windowKey(DEMO.task, DEMO.subject), DEMO.window);
-    setComponents(["Q"]);
+    setComponents(["Q", "D", "U"]);
+    setCalibration("validation");
     setVariant("fusion");
   };
 
@@ -52,7 +53,7 @@ export default function GuidedDemo() {
     },
     {
       title: "The reliability engine notices",
-      body: "The suppressed stream's signal-quality evidence is ranked against clean data from all other people: its reliability collapses, its fusion weight closes and a low-confidence flag is raised. The same frozen checkpoint now gives the defended decision. Disagreement (D) and uncertainty (U) are shown alongside and can be switched on.",
+      body: "Signal quality (Q), cross-modal disagreement (D) and predictive uncertainty (U) of the suppressed stream are combined and ranked against clean validation data: its reliability collapses, its fusion weight closes and a low-confidence flag is raised. The same frozen checkpoint now gives the defended decision.",
       route: "/attack",
     },
     {
@@ -72,7 +73,7 @@ export default function GuidedDemo() {
     },
     {
       title: "Measured over 15 people",
-      body: "All numbers come from the full LOSO evaluation with subject-bootstrap confidence intervals. The four pre-registered hypotheses (attack effectiveness, modality sensitivity, mitigation, detectability) are tested and reported as supported or not, without cherry-picking.",
+      body: "All numbers come from the full LOSO evaluation with subject-bootstrap confidence intervals. The four pre-registered hypotheses (attack effectiveness, modality sensitivity, mitigation, detectability) are tested and reported as supported or not, without cherry-picking. That includes the price of the defense: its false alarms on clean windows of people it has never seen.",
       route: "/results",
       apply: () => setTask(DEMO.task),
     },

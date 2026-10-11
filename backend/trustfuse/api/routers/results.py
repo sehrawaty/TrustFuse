@@ -11,7 +11,7 @@ from ...experiments import results as store
 
 router = APIRouter(tags=["results"])
 DOWNLOADABLE = {"summary.json", "conditions.json", "detection.json", "calibration.json", "run.json", "config.yaml",
-                "rows.csv.gz", "subjects.csv.gz", "manifest.npz"}
+                "rows.csv.gz", "subjects.csv.gz", "manifest.npz", "bursts.csv.gz"}
 
 
 def _guard(fn, *a, **kw):

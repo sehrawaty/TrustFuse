@@ -81,8 +81,11 @@ def cmd_run(args) -> int:
 
 
 def cmd_report(_args) -> int:
-    from .evaluation.report_md import write_results_md
+    from .evaluation.report_md import write_readme_headline, write_results_md
     print(f"wrote {write_results_md()}")
+    readme = write_readme_headline()
+    if readme:
+        print(f"updated key findings in {readme}")
     return 0
 
 

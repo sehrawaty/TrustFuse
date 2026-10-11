@@ -15,9 +15,10 @@ reasoning (not tuned on test data):
     sqi        BVP spectral quality: share of power in the cardiac band 0.7-3.5 Hz lower = worse
 
 Indicators are compared with a clean reference distribution through directional robust
-z-scores (median / IQR-scaled). Because Q is model-free its reference pools every non-test
-subject (training + validation), which captures inter-subject variability. The Q anomaly of a
-window is its largest directional z-score.
+z-scores (median / IQR-scaled). The reference is fitted by the reliability engine: on the clean
+validation subjects (the report's calibration, the default) and, as an extension, on every
+non-test subject (training + validation). The Q anomaly of a window is its largest directional
+z-score.
 """
 
 from __future__ import annotations
@@ -112,14 +113,22 @@ class QualityCalibration:
         self.scale = np.maximum(iqr / 1.349, floors)
         return self
 
-    def zscores(self, x: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        f = raw_features(self.modality, x, self.hz)
+    def zscores_from_features(self, f: np.ndarray) -> np.ndarray:
         z = (f - self.median) / self.scale
         directional = np.empty_like(z)
         for i, n in enumerate(self.names):
             d = DIRECTION[n]
             directional[:, i] = np.abs(z[:, i]) if d == 0 else d * z[:, i]
-        return f, np.clip(directional, -Z_CAP, Z_CAP)
+        return np.clip(directional, -Z_CAP, Z_CAP)
+
+    def zscores(self, x: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        f = raw_features(self.modality, x, self.hz)
+        return f, self.zscores_from_features(f)
+
+    def anomaly_from_features(self, f: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        """Q anomaly and directional z-scores from already computed raw indicators."""
+        z = self.zscores_from_features(f)
+        return np.clip(z.max(axis=1), 0.0, Z_CAP), z
 
     def anomaly(self, x: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         f, z = self.zscores(x)

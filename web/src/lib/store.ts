@@ -11,6 +11,9 @@ export const DEFAULT_ATTACK: Attack = {
   seed: 0,
 };
 
+/** validation = report scheme (validation subjects only); pooled = extension (Q referenced to all non-test subjects). */
+export type Calibration = "validation" | "pooled";
+
 interface AppState {
   task: string;
   subject: Record<string, string>;
@@ -18,6 +21,7 @@ interface AppState {
   attack: Attack;
   variant: "fusion" | "moddrop";
   components: string[];
+  calibration: Calibration;
   run: Record<string, string>;
   demoStep: number | null;
   setTask: (t: string) => void;
@@ -27,6 +31,7 @@ interface AppState {
   setVariant: (v: "fusion" | "moddrop") => void;
   toggleComponent: (c: string) => void;
   setComponents: (c: string[]) => void;
+  setCalibration: (c: Calibration) => void;
   setRun: (task: string, run: string) => void;
   setDemoStep: (s: number | null) => void;
 }
@@ -45,7 +50,9 @@ export const useApp = create<AppState>((set, get) => ({
   window: {},
   attack: DEFAULT_ATTACK,
   variant: "fusion",
-  components: ["Q"],
+  // report design: R combines Q, D and U, calibrated on clean validation subjects only
+  components: ["Q", "D", "U"],
+  calibration: "validation",
   run: {},
   demoStep: null,
   setTask: (task) => {
@@ -66,6 +73,7 @@ export const useApp = create<AppState>((set, get) => ({
     set({ components: cur.includes(c) ? cur.filter((x) => x !== c) : [...cur, c].sort((a, b) => "QDU".indexOf(a) - "QDU".indexOf(b)) });
   },
   setComponents: (components) => set({ components }),
+  setCalibration: (calibration) => set({ calibration }),
   setRun: (task, run) => set({ run: { ...get().run, [task]: run } }),
   setDemoStep: (demoStep) => set({ demoStep }),
 }));

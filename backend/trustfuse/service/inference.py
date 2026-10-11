@@ -16,7 +16,7 @@ from ..attacks.simulator import AttackSimulator, AttackSpec
 from ..data.loader import DatasetLoader
 from ..data.preprocess import Preprocessor, load_stream
 from ..models.checkpoint import find_checkpoint
-from ..reliability.engine import DEFAULT_COMPONENTS, Decision, ModalityOutput
+from ..reliability.engine import DEFAULT_CALIBRATION, DEFAULT_COMPONENTS, Decision, ModalityOutput
 from ..specs import DATASETS, LABEL_HZ, MODALITY_SPECS, TASKS, get_task
 from .bundle import BundleCache, FoldBundle
 
@@ -142,24 +142,25 @@ class InferenceService:
 
     def _modality_payload(self, b: FoldBundle, dec: Decision, outs: dict[str, ModalityOutput], i: int = 0) -> dict:
         eng = b.engine
-        dist = eng._distribution(dec.components)
+        dist = eng._distribution(dec.components, dec.calibration)
         out = {}
         for m in b.task.modalities:
             ev = dec.evidence[m]
-            q = eng.quality[m]
+            q = eng.quality[dec.calibration][m]
             out[m] = {
                 "Q": _r(ev["Q"][i]), "D": _r(ev["D"][i]), "U": _r(ev["U"][i]), "zD": _r(ev["zD"][i]), "zU": _r(ev["zU"][i]),
                 "anomaly": _r(dec.anomaly[m][i]), "R": _r(dec.reliability[m][i]), "w": _r(dec.weights[m][i]),
                 "tau": _r(dist[m]["tau"]), "median": _r(dist[m]["median"]), "span": _r(dist[m]["span"]),
                 "unimodal": _r(dec.aux_probs[m][i]),
-                "quality": {"names": list(q.names), "values": _r(outs[m].q_feat[i]), "z": _r(outs[m].q_z[i]),
+                "quality": {"names": list(q.names), "values": _r(outs[m].q_feat[i]), "z": _r(outs[m].quality(dec.calibration)[1][i]),
                             "reference_median": _r(q.median), "reference_scale": _r(q.scale)},
             }
         return out
 
     # ------------------------------------------------------------------ attack lab
     def infer(self, task_key: str, subject: str, index: int, attack: dict | None = None, variant: str = "fusion",
-              seed: int = 0, components: list[str] | None = None, strategy: str = "embedding_gate") -> dict:
+              seed: int = 0, components: list[str] | None = None, strategy: str = "embedding_gate",
+              calibration: str | None = None) -> dict:
         trace = []
         t = time.perf_counter()
 
@@ -172,11 +173,12 @@ class InferenceService:
         b = self.bundle(task_key, subject, variant, seed)
         eng = b.engine
         comps = tuple(components) if components else DEFAULT_COMPONENTS
+        calib = calibration or DEFAULT_CALIBRATION
         t = time.perf_counter()   # time the pipeline itself, not the one-off model load
         phys, y, start = self._window_phys(task_key, subject, index)
         step("Send synchronized window")
         clean_outs = eng.outputs(phys)
-        clean = eng.decide(clean_outs, components=comps, strategy=strategy)
+        clean = eng.decide(clean_outs, components=comps, strategy=strategy, calibration=calib)
         step("Forward clean signals")
         spec = self._spec(attack)
         attacked_phys = phys
@@ -188,7 +190,7 @@ class InferenceService:
         outs = dict(clean_outs)
         if spec.type != "none":
             outs[spec.modality] = eng.modality_output(spec.modality, attacked_phys[spec.modality])
-        dec = eng.decide(outs, components=comps, strategy=strategy)
+        dec = eng.decide(outs, components=comps, strategy=strategy, calibration=calib)
         step("Generate baseline prediction")
         step("Compute reliability / disagreement")
         step("Down-weight unreliable modality")
@@ -214,7 +216,7 @@ class InferenceService:
             "modalities": self._modality_payload(b, dec, outs),
             "flag": bool(dec.flag[0]), "min_r": _r(dec.min_reliability()[0]),
             "flag_threshold": eng.alpha / len(task.modalities), "alpha": eng.alpha,
-            "components": list(comps), "strategy": strategy, "model": b.meta(),
+            "components": list(comps), "calibration": calib, "strategy": strategy, "model": b.meta(),
         }
         step("Log attack + performance")
         result["trace"] = trace
@@ -340,12 +342,13 @@ class InferenceService:
         }
 
     def calibration(self, task_key: str, subject: str, variant: str = "fusion", seed: int = 0,
-                    components: list[str] | None = None) -> dict:
+                    components: list[str] | None = None, calibration: str | None = None) -> dict:
         b = self.bundle(task_key, subject, variant, seed)
         comps = tuple(components) if components else DEFAULT_COMPONENTS
-        return {"subject": subject, "components": list(comps), "alpha": b.engine.alpha,
+        calib = calibration or DEFAULT_CALIBRATION
+        return {"subject": subject, "components": list(comps), "calibration": calib, "alpha": b.engine.alpha,
                 "flag_threshold": b.engine.alpha / len(b.task.modalities),
-                "modalities": b.engine.calibration_summary(comps), "model": b.meta()}
+                "modalities": b.engine.calibration_summary(comps, calib), "model": b.meta()}
 
 
 def _patch(clean: Decision, part: Decision, idx: np.ndarray) -> Decision:
@@ -361,4 +364,4 @@ def _patch(clean: Decision, part: Decision, idx: np.ndarray) -> Decision:
         reliability={m: put(clean.reliability[m], part.reliability[m]) for m in clean.reliability},
         weights={m: put(clean.weights[m], part.weights[m]) for m in clean.weights},
         flag=put(clean.flag, part.flag), components=clean.components,
-        margin={m: put(clean.margin[m], part.margin[m]) for m in clean.margin})
+        margin={m: put(clean.margin[m], part.margin[m]) for m in clean.margin}, calibration=clean.calibration)

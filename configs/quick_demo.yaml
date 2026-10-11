@@ -26,6 +26,7 @@ attacks:
   strategies: [random_drop, targeted]
 reliability:
   ablations: []
+  calibration_ablations: []
 stats:
   n_boot: 500
 models_root: runtime

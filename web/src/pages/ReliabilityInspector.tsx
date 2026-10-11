@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import EChart, { ttRow } from "../components/charts/EChart";
 import Tex from "../components/Tex";
-import { AttackBadge, Badge, Card, CardHeader, ErrorNote, FlagBadge, InfoTip, PageHeader, SectionTitle, Select, Skeleton } from "../components/ui";
+import { AttackBadge, Badge, Card, CardHeader, ErrorNote, FlagBadge, InfoTip, PageHeader, SectionTitle, Segmented, Select, Skeleton } from "../components/ui";
 import { api, type Calibration, type InferResult } from "../lib/api";
 import { COLORS, MODALITY_COLOR, MODALITY_LABEL } from "../lib/palette";
 import { defaultWindow, useApp, windowKey } from "../lib/store";
@@ -21,7 +21,7 @@ const FEATURE_TEXT: Record<string, string> = {
 };
 
 export default function ReliabilityInspector() {
-  const { task, subject: subjMap, setSubject, window: winMap, attack, components, toggleComponent, variant } = useApp();
+  const { task, subject: subjMap, setSubject, window: winMap, attack, components, toggleComponent, calibration, setCalibration, variant } = useApp();
   const ov = useQuery({ queryKey: ["overview"], queryFn: api.overview });
   const taskInfo = ov.data?.tasks.find((t) => t.key === task);
   const mods = taskInfo?.modalities ?? [];
@@ -29,12 +29,13 @@ export default function ReliabilityInspector() {
   const subject = subjMap[task] ?? "S2";
   const windows = useQuery({ queryKey: ["windows", task, subject], queryFn: () => api.windows(task, subject) });
   const win = winMap[windowKey(task, subject)] ?? defaultWindow(windows.data);
-  const comps = components.join("") || "Q";
-  const pooled = comps === "Q";
-  const calib = useQuery({ queryKey: ["calibration", task, subject, comps], queryFn: () => api.calibration(task, subject, comps), placeholderData: keepPreviousData });
+  const comps = components.join("") || "QDU";
+  // only the pooled extension with evidence {Q} ranks against all non-test subjects
+  const pooled = calibration === "pooled" && comps === "Q";
+  const calib = useQuery({ queryKey: ["calibration", task, subject, comps, calibration], queryFn: () => api.calibration(task, subject, comps, calibration), placeholderData: keepPreviousData });
   const infer = useQuery({
-    queryKey: ["infer", task, subject, { attack, win, components: components.join(""), variant }],
-    queryFn: () => api.infer({ task, subject, window: win, variant, attack, components }),
+    queryKey: ["infer", task, subject, { attack, win, components: components.join(""), variant, calibration }],
+    queryFn: () => api.infer({ task, subject, window: win, variant, attack, components, calibration }),
     placeholderData: keepPreviousData,
     enabled: !!windows.data,
   });
@@ -68,7 +69,7 @@ export default function ReliabilityInspector() {
           <CardHeader eyebrow="Method" title="From evidence to fusion weight" sub="Each step below applies independently to every modality m of the current window." />
           <div className="divide-y divide-line">
             <Eq n="1" title="Signal quality (model-free)" tex={String.raw`Q_m=\max_k\;\tilde z_{m,k},\qquad \tilde z_{m,k}=\delta_k\,\frac{f_{m,k}-\operatorname{med}_k}{\operatorname{IQR}_k/1.349}`}>
-              Indicators f such as exact-zero share, longest constant run and plausibility are compared with all non-test subjects. The direction δ keeps only suspicious movement.
+              Indicators f such as exact-zero share, longest constant run and plausibility are compared with the clean validation subjects (in the pooled extension: with all non-test subjects). The direction δ keeps only suspicious movement.
             </Eq>
             <Eq n="2" title="Cross-modal disagreement" tex={String.raw`D_m=\mathrm{JS}\!\left(g_m(h_m)\;\Big\|\;\tfrac{1}{M-1}\textstyle\sum_{j\neq m} g_j(h_j)\right)`}>
               The unimodal head of m is compared with the consensus of the other heads, in bits.
@@ -77,9 +78,10 @@ export default function ReliabilityInspector() {
               Entropy of the MC-dropout mean (T = 8 passes with reproducible masks).
             </Eq>
             <Eq n="4" title="Conformal reliability" tex={String.raw`a_m=\sum_{c\in\mathcal{E}} z_c,\qquad R_m=\frac{1+\#\{i\in\text{ref}: a^{(i)}_m\ge a_m\}}{n_{\text{ref}}+1}`}>
-              Under clean, exchangeable data P(R ≤ t) ≤ t, and the flag fires when the smallest R falls to α/M or below. The default evidence is E = {"{Q}"}, ranked against clean
-              windows of <em>every non-test person</em>. This subject-diverse reference was chosen in a validation-only study: calibrating on two people gave 18% false
-              flags on others, while pooling gave 6%. Adding D or U uses the held-out validation subjects as the reference.
+              The report design combines all three channels, E = {"{Q, D, U}"}, and ranks the sum against clean windows of the <em>validation subjects</em>; every scaling
+              parameter and threshold is frozen before any attack is evaluated. For data exchangeable with that reference P(R ≤ t) ≤ t, and the flag fires when the smallest
+              R falls to α/M or below. People differ, so new users are not exactly exchangeable with two validation subjects: the Results page reports the resulting
+              false-alarm rate and the pooled-reference extension that lowers it.
             </Eq>
             <Eq n="5" title="Reliability-gated fusion" tex={String.raw`w_m=\operatorname{clip}\!\left(1-\frac{a_m-\tau_m}{\tau_m-\operatorname{med}(a_m)},0,1\right),\qquad \tilde h_m=w_m h_m+(1-w_m)\,\mu_m`}>
               τ is the conformal 1 − α/M threshold. The same frozen classifier receives the gated embeddings.
@@ -156,6 +158,17 @@ export default function ReliabilityInspector() {
                     </button>
                   ))}
                 </div>
+                <div className="eyebrow mb-2 mt-4 flex items-center gap-1">
+                  Calibration reference <InfoTip>Validation is the report design. Pooled is the extension that references signal quality to every non-test subject.</InfoTip>
+                </div>
+                <Segmented
+                  value={calibration}
+                  onChange={setCalibration}
+                  options={[
+                    { value: "validation", label: "Validation (report)" },
+                    { value: "pooled", label: "Pooled (extension)" },
+                  ]}
+                />
               </div>
             </div>
           ) : (
@@ -175,7 +188,7 @@ export default function ReliabilityInspector() {
           )
         }
       >
-        Frozen calibration (clean, non-test data only)
+        Frozen calibration ({pooled ? "clean data of all non-test subjects" : "clean validation subjects only"})
       </SectionTitle>
       {calib.isError && <ErrorNote error={calib.error} />}
       <div className="grid gap-4 md:grid-cols-2">

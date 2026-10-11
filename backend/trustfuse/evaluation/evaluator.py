@@ -23,6 +23,10 @@ from ..service.bundle import FoldBundle
 from .metrics import accuracy, auroc, balanced_accuracy, expected_calibration_error, macro_f1
 
 CONF_HIGH = 0.8
+# columns of the burst traceability table (one row per burst-affected window)
+BURST_FIELDS = ("start_s", "y", "modality", "burst_windows", "placement", "burst_start_s", "burst_end_s",
+                "fully_suppressed", "fixed_pred", "def_pred", "fixed_conf", "def_conf", "r_target", "w_target",
+                "flag", "clean_fixed_pred", "clean_def_pred")
 
 
 @dataclass
@@ -31,11 +35,12 @@ class FoldEvaluation:
     manifest: dict[str, np.ndarray] = field(default_factory=dict)
     windows: dict[str, np.ndarray] = field(default_factory=dict)
     scores: dict[str, np.ndarray] = field(default_factory=dict)
+    bursts: dict[str, np.ndarray] = field(default_factory=dict)   # one record per burst-affected window
 
 
 def _cond_id(**kw) -> str:
     parts = [kw.get("family", "")]
-    for k in ("modality", "fill", "severity", "snr_db", "burst", "components", "strategy"):
+    for k in ("modality", "fill", "severity", "snr_db", "burst", "components", "strategy", "calibration"):
         v = kw.get(k)
         if v is not None and v != "":
             parts.append(f"{k}={v:g}" if isinstance(v, float) else f"{k}={v}")
@@ -62,6 +67,7 @@ def select_decision(decs: list[Decision], choice: np.ndarray) -> Decision:
         flag=pick([d.flag for d in decs]),
         components=first.components,
         margin={m: pick([d.margin[m] for d in decs]) for m in mods},
+        calibration=first.calibration,
     )
 
 
@@ -117,7 +123,7 @@ def _subset(dec: Decision, idx: np.ndarray) -> Decision:
         anomaly={m: v[idx] for m, v in dec.anomaly.items()},
         reliability={m: v[idx] for m, v in dec.reliability.items()},
         weights={m: v[idx] for m, v in dec.weights.items()}, flag=dec.flag[idx], components=dec.components,
-        margin={m: v[idx] for m, v in dec.margin.items()})
+        margin={m: v[idx] for m, v in dec.margin.items()}, calibration=dec.calibration)
 
 
 class Evaluator:
@@ -154,9 +160,10 @@ class Evaluator:
         mods = self.task.modalities
         comps = tuple(self.cfg.reliability.components)
         strategy = self.cfg.reliability.strategy
+        calib = self.cfg.reliability.calibration
         sim = AttackSimulator(mods)
         clean_outs = eng.outputs(self.ws.phys)
-        clean = eng.decide(clean_outs, components=comps, strategy=strategy)
+        clean = eng.decide(clean_outs, components=comps, strategy=strategy, calibration=calib)
         rows: list[dict] = []
         manifest: dict[str, np.ndarray] = {}
         scores: dict[str, np.ndarray] = {}
@@ -171,12 +178,12 @@ class Evaluator:
                 cache[key] = eng.modality_output(spec.modality, x)
             return cache[key]
 
-        def dec_for(spec: AttackSpec, components=comps, strat=strategy) -> Decision:
-            key = (spec.type, spec.modality, spec.fill, round(spec.severity, 4), spec.snr_db, components, strat)
+        def dec_for(spec: AttackSpec, components=comps, strat=strategy, cal=calib) -> Decision:
+            key = (spec.type, spec.modality, spec.fill, round(spec.severity, 4), spec.snr_db, components, strat, cal)
             if key not in decs:
                 outs = dict(clean_outs)
                 outs[spec.modality] = out_for(spec)
-                decs[key] = eng.decide(outs, components=components, strategy=strat)
+                decs[key] = eng.decide(outs, components=components, strategy=strat, calibration=cal)
             return decs[key]
 
         def record(family: str, dec: Decision, target: str | None, store_scores: bool = False,
@@ -256,26 +263,31 @@ class Evaluator:
         self.log(f"  {self.b.subject}: attacker strategies done")
 
         # 3) stream-level bursts
-        rows += self._bursts(eng, clean, clean_outs, comps, strategy)
+        burst_rows, burst_records = self._bursts(eng, clean, clean_outs, comps, strategy, calib, with_manifest)
+        rows += burst_rows
         self.log(f"  {self.b.subject}: bursts done")
 
-        # 4) ablations of the reliability evidence and of the fusion strategy
+        # 4) ablations: evidence subsets and the fusion strategy under the primary calibration,
+        #    then the calibration extension (the other scheme) for selected evidence sets
+        R = self.cfg.reliability
         abl_specs = [AttackSpec("none")]
         for m in mods:
             abl_specs += [AttackSpec("mask", m, 1.0, self.cfg.stats.primary_fill, placement="start"),
                           AttackSpec("attenuate", m, 0.8), AttackSpec("mask", m, 1.0, "hold", placement="start")]
-        variants = [(tuple(c), strategy) for c in self.cfg.reliability.ablations]
-        if self.cfg.reliability.ablations:
-            variants.append((comps, "poe" if strategy != "poe" else "embedding_gate"))
-        for c, strat in variants:
-            clean_v = eng.decide(clean_outs, components=c, strategy=strat)
+        variants = [(tuple(c), strategy, calib) for c in R.ablations]
+        if R.ablations:
+            variants.append((comps, "poe" if strategy != "poe" else "embedding_gate", calib))
+        other = "pooled" if calib == "validation" else "validation"
+        variants += [(tuple(c), strategy, other) for c in R.calibration_ablations]
+        for c, strat, cal in variants:
+            clean_v = eng.decide(clean_outs, components=c, strategy=strat, calibration=cal)
             for spec in abl_specs:
-                dec = clean_v if spec.type == "none" else dec_for(spec, components=c, strat=strat)
+                dec = clean_v if spec.type == "none" else dec_for(spec, components=c, strat=strat, cal=cal)
                 cid = _cond_id(family="ablation", modality=spec.modality, fill=spec.fill if spec.type == "mask" else None,
                                severity=spec.severity if spec.type != "none" else None,
-                               components="".join(c), strategy=strat) + f"|attack={spec.type}"
+                               components="".join(c), strategy=strat, calibration=cal) + f"|attack={spec.type}"
                 row = {**self.base, "cond": cid, "family": "ablation", "attack": spec.type, "modality": spec.modality,
-                       "components": "".join(c), "strategy": strat,
+                       "components": "".join(c), "strategy": strat, "calibration": cal,
                        "fill": spec.fill if spec.type == "mask" else None,
                        "severity": spec.severity if spec.type != "none" else None}
                 row.update(compute_metrics(self.y, dec, clean_v, self.k, spec.modality))
@@ -284,7 +296,7 @@ class Evaluator:
                 rows.append(row)
 
         windows = {"start_s": self.ws.start_s.astype(np.int32), "y": self.y.astype(np.int8)}
-        return FoldEvaluation(rows=rows, manifest=manifest, windows=windows, scores=scores)
+        return FoldEvaluation(rows=rows, manifest=manifest, windows=windows, scores=scores, bursts=burst_records)
 
     @staticmethod
     def _adaptive_choice(cands: list[Decision], cost: np.ndarray, clean: Decision) -> np.ndarray:
@@ -312,7 +324,10 @@ class Evaluator:
             choice = np.where(none, alt, choice)
         return choice
 
-    def _bursts(self, eng, clean: Decision, clean_outs: dict, comps, strategy) -> list[dict]:
+    def _bursts(self, eng, clean: Decision, clean_outs: dict, comps, strategy, calib: str,
+                with_manifest: bool = False) -> tuple[list[dict], dict[str, np.ndarray]]:
+        """Aggregated burst rows plus, for the manifest model, one traceability record per
+        burst-affected window (target modality, burst length, placement, interval, decisions)."""
         A = self.cfg.attacks
         task = self.task
         stream = load_stream(task.key, self.b.subject)
@@ -321,6 +336,7 @@ class Evaluator:
         seg = self.ws.segment
         W, S = task.window_s, task.stride_s
         out_rows = []
+        rec: dict[str, list] = {k: [] for k in BURST_FIELDS}
         for B in A.burst_windows:
             valid = np.array([i for i in range(len(starts) - B + 1)
                               if seg[i] == seg[i + B - 1] and starts[i + B - 1] - starts[i] == (B - 1) * S])
@@ -331,7 +347,7 @@ class Evaluator:
             for m in task.modalities:
                 hz = task.model_hz[m]
                 full_idx, part_idx, decs_full, decs_part, latency = [], [], [], [], []
-                for i in picks:
+                for p, i in enumerate(picks):
                     begin, end = float(starts[i]), float(starts[i + B - 1] + W)
                     aff = np.flatnonzero((starts < end) & (starts + W > begin))
                     full = (starts[aff] >= begin) & (starts[aff] + W <= end)
@@ -339,7 +355,26 @@ class Evaluator:
                     phys_m = pp.extract(sig, starts[aff], (m,))[m]
                     outs = {j: clean_outs[j].take(aff) for j in task.modalities}
                     outs[m] = eng.modality_output(m, phys_m)
-                    dec = eng.decide(outs, components=comps, strategy=strategy)
+                    dec = eng.decide(outs, components=comps, strategy=strategy, calibration=calib)
+                    if with_manifest:
+                        n_aff = len(aff)
+                        rec["start_s"].append(starts[aff])
+                        rec["y"].append(self.y[aff])
+                        rec["modality"].append(np.full(n_aff, m))
+                        rec["burst_windows"].append(np.full(n_aff, B))
+                        rec["placement"].append(np.full(n_aff, p))
+                        rec["burst_start_s"].append(np.full(n_aff, begin))
+                        rec["burst_end_s"].append(np.full(n_aff, end))
+                        rec["fully_suppressed"].append(full)
+                        rec["fixed_pred"].append(dec.fixed_pred)
+                        rec["def_pred"].append(dec.defended_pred)
+                        rec["fixed_conf"].append(dec.fixed_probs.max(1))
+                        rec["def_conf"].append(dec.defended_probs.max(1))
+                        rec["r_target"].append(dec.reliability[m])
+                        rec["w_target"].append(dec.weights[m])
+                        rec["flag"].append(dec.flag)
+                        rec["clean_fixed_pred"].append(clean.fixed_pred[aff])
+                        rec["clean_def_pred"].append(clean.defended_pred[aff])
                     decs_full.append(_subset(dec, np.flatnonzero(full)))
                     decs_part.append(_subset(dec, np.flatnonzero(~full)))
                     full_idx.append(aff[full])
@@ -358,7 +393,8 @@ class Evaluator:
                     row["latency_s"] = float(np.nanmean(latency)) if np.isfinite(latency).any() else float("nan")
                     row["detected_bursts"] = float(np.mean(np.isfinite(latency)))
                     out_rows.append(row)
-        return out_rows
+        records = {k: np.concatenate(v) for k, v in rec.items()} if rec["start_s"] else {}
+        return out_rows, records
 
 
 def _concat(decs: list[Decision]) -> Decision:
@@ -372,4 +408,4 @@ def _concat(decs: list[Decision]) -> Decision:
         reliability={m: cat([d.reliability[m] for d in decs]) for m in f.reliability},
         weights={m: cat([d.weights[m] for d in decs]) for m in f.weights},
         flag=cat([d.flag for d in decs]), components=f.components,
-        margin={m: cat([d.margin[m] for d in decs]) for m in f.margin})
+        margin={m: cat([d.margin[m] for d in decs]) for m in f.margin}, calibration=f.calibration)

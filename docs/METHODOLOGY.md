@@ -44,8 +44,8 @@ individually novel.
   train, validation and test never share a subject.
 * **Normalisation** uses z-scores computed from the fold's training windows only.
 * **Early stopping** uses validation macro-F1.
-* **Reliability calibration** uses only clean data from non-test subjects (§5.4). It is frozen
-  before any attack is evaluated.
+* **Reliability calibration** uses only clean data of the fold's validation subjects (§6.4), as
+  the project report specifies. It is frozen before any attack is evaluated.
 * **Matched comparison.** The fixed and reliability-aware pipelines use the same frozen
   checkpoint and receive byte-identical attacked windows.
 * **Pre-registration.** Everything is fixed in `configs/*.yaml` before test evaluation: the
@@ -71,7 +71,8 @@ Baselines:
 Training settings:
 * AdamW (lr 2e-3, weight decay 1e-4), cosine schedule, class-weighted cross-entropy.
 * Up to 40 epochs, patience 7, batch size 64.
-* Fixed seeds: 3 seeds for the headline fusion model, 1 for the other models.
+* Fixed seeds: 3 seeds for the fusion model of every task (the model that is attacked and
+  defended); 1 seed for the ModDrop and unimodal baselines. Seeds are averaged within a subject.
 * Checkpoints are stored in fp16.
 
 ## 5. Selective Modality Suppression Attack (SMSA)
@@ -100,7 +101,15 @@ Attackers. Each suppresses one modality per window, fully masked:
   *defended* decision without raising the flag. If no candidate does, it takes the most
   damaging unflagged candidate.
 
-Every attacked window is written to `manifest.npz` with its decisions, reliability and flag.
+Traceability. Every attacked window is stored with its target modality, attack parameters, both
+decisions, the target's reliability and weight, and the flag:
+* `manifest.npz` holds every window-level attack (masking, attenuation, noise and the four
+  attackers);
+* `bursts.csv.gz` holds one row per burst-affected window, with the burst length, placement,
+  suppressed interval and whether the window was fully or partly covered.
+
+Each result set also records the configuration and its hash, library versions, the git commit
+with a dirty flag, and a SHA-256 of the package sources that produced it (`run.json`).
 
 ## 6. Reliability-aware fusion
 
@@ -119,9 +128,10 @@ Indicators per modality, fixed from sensor-quality practice:
 Each indicator becomes a *directional* robust z-score: (value − median) / (IQR / 1.349), keeping
 only movement in the suspicious direction. Q_m is the largest of these z-scores.
 
-The Q reference pools clean windows of **all non-test subjects** (training and validation; up to
-300 per subject). Physiological levels vary strongly between people. A reference built from the
-two validation subjects alone produced false alarms on clean windows of new subjects (§9).
+The Q reference (medians and scales of the indicators) is fitted on clean windows of the fold's
+**validation subjects**, like every other scaling parameter (report §4.3.3). The pooled
+extension of §6.6 fits it on all non-test subjects instead (training and validation; up to 300
+windows per subject).
 
 ### 6.2 Disagreement D
 
@@ -135,16 +145,19 @@ Dropout masks come from a seeded generator, so identical inputs always give iden
 
 ### 6.4 Conformal reliability, flag and gate
 
-* **Evidence set E.** The anomaly of modality m is a_m = Σ_{c∈E} z_c. The **default operating
-  point is E = {Q}** (§6.6). Q is ≥ 0 by construction. z(D) and z(U) are robust z-scores against
-  the clean **validation** windows, clipped to [−3, 50]; the validation subjects were not used
-  for fitting.
+* **Evidence set E.** The anomaly of modality m is a_m = Σ_{c∈E} z_c. The **primary analysis
+  uses E = {Q, D, U}**, the combination the project report specifies. Q is ≥ 0 by construction.
+  z(D) and z(U) are robust z-scores against the clean **validation** windows, clipped to
+  [−3, 50]; the validation subjects were not used for fitting the model.
 * **Reliability.** R_m = (1 + #{reference windows with a ≥ a_m}) / (n_ref + 1) is a conformal
-  p-value. On clean, exchangeable data P(R ≤ t) ≤ t (unit-tested). Comparisons happen in the
-  reference's float32 precision so ties stay ties.
-* **Reference set.** For E = {Q} it is every non-test subject (up to 300 windows each), since Q is
-  model-free. For evidence sets that include the model-based D or U, it is the held-out
-  validation subjects.
+  p-value. On clean data exchangeable with the reference, P(R ≤ t) ≤ t (unit-tested).
+  Comparisons happen in the reference's float32 precision so ties stay ties.
+* **Reference set.** The clean windows of the fold's two validation subjects, for every evidence
+  set. Nothing else enters the calibration: a unit test refits every reference from the
+  validation subjects alone and compares it with the frozen calibration.
+* **What the guarantee does not cover.** A new person is not exactly exchangeable with two
+  validation subjects, so the false-alarm rate on held-out people can exceed α. It is measured
+  (H4) rather than assumed; §6.6 analyses it.
 * **Low-confidence flag**: min_m R_m ≤ α / M, with α = 0.05 (Bonferroni over the M modalities).
 * **Gate**: w_m = clip(1 − (a_m − τ_m) / (τ_m − median a_m), 0, 1), where τ_m is the conformal
   (1 − α/M) quantile of the reference.
@@ -170,30 +183,48 @@ over modalities:
 | Leave-one-out heads on frozen embeddings | 0.680 | 0.865 | 0.832 | 0.822 | 0.800 |
 | **Neutral-input embedding (adopted)** | **0.766** | 0.865 | 0.871 | **0.895** | **0.849** |
 
-### 6.6 Why the default evidence is subject-calibrated Q (validation-only study)
+### 6.6 Calibration reference: the report design and the pooled extension
 
-**What prompted the study.** A preliminary run of the supplementary 3-class experiment, with
-E = {Q, D, U} calibrated on the two validation subjects, flagged about 22 % of *clean* windows of
-held-out people. The flag is meant to stay near α = 5 %. The run was diagnosed and then discarded.
+**Primary analysis (report design).** The reliability score combines Q, D and U, and every
+reference comes from the fold's two validation subjects. The project report fixed this design
+before any experiment was run. All hypothesis tests, tables and figures use it.
 
-**Protocol.** To choose a fix without using test subjects, each fold's two validation subjects
-were swapped: calibrate on one, measure on the other. This reproduced the problem (18 % clean
-false flags) and allowed the calibration schemes to be compared. Results over 6 WESAD folds × 2
-directions; the clean column is the false-flag rate, the others are attack detection rates:
+**What it costs.** The flag is meant to fire on about α = 5 % of clean windows. On held-out
+people it fires more often: physiological levels and the behaviour of the weak unimodal heads
+(especially TEMP and EDA) differ between people, and two validation subjects do not span that
+variation. `docs/RESULTS.md` reports the measured rate for every task ("Clean false flags" and
+H4). The mitigation itself is not affected: a suppressed stream is far outside any clean
+reference.
+
+**Validation-only study of the cause.** To study the false alarms without using test subjects,
+each fold's two validation subjects were swapped: calibrate on one, measure on the other.
+Results over 6 WESAD folds × 2 directions, recorded during development; the clean column is the
+false-flag rate, the others are attack detection rates:
 
 | Scheme | Clean false flags | Zero-mask 100 % | Zero-mask 40 % | Hold 100 % | Attenuate 80 % |
 |---|---|---|---|---|---|
 | Q+D+U, reference = one held-out subject | 18.4 % (max 71 %) | 100 % | 95.5 % | 100 % | 65.2 % |
-| **Q, reference pooled over the other non-test subjects** | **6.1 %** (max 16 %) | 100 % | 100 % | 100 % | 59.0 % |
+| Q, reference pooled over the other non-test subjects | 6.1 % (max 16 %) | 100 % | 100 % | 100 % | 59.0 % |
 | min(Q pooled, D+U held-out) | 24.8 % | 100 % | 84.9 % | 100 % | 70.9 % |
 | Q pooled ∨ D+U held-out (α split 3:1) | 22.8 % | 100 % | 100 % | 100 % | 69.6 % |
 
-**Finding.** Model-based evidence (disagreement, uncertainty) calibrated on a few people does not
-transfer to new people. The weak unimodal heads, especially TEMP and EDA, disagree with the others
-in a person-specific way. Model-free quality evidence calibrated against many people stays close
-to its nominal false-alarm rate and loses nothing on masking attacks. The canonical evaluation
-therefore uses E = {Q}. D and U are still computed for every window and shown in the UI, and the
-ablations evaluate every evidence subset (Q+D+U, Q+D, Q+U, D+U, D, U).
+Model-based evidence (disagreement, uncertainty) calibrated on a few people does not transfer to
+new people. Model-free quality evidence referenced to many people stays close to its nominal
+false-alarm rate and loses nothing on masking attacks.
+
+**Extension (not the primary analysis).** `calibration: pooled` references the signal-quality
+indicators to every non-test subject and, for the evidence set {Q}, ranks against that pooled
+reference. It is evaluated on the same folds and conditions as the primary defense and reported
+next to it: the "Evidence sets and calibration reference" table of `docs/RESULTS.md`, the
+Results → Ablations tab, and the calibration switch in the Attack Lab. It departs from the
+report in two ways, which is why it is labelled an extension: it leaves D and U out of the
+score, and its reference includes training subjects (never test subjects).
+
+**Development history.** An intermediate version of this repository (commit `9d57d36`) used the
+pooled Q variant as its primary analysis, after a preliminary run on held-out subjects had shown
+the false alarms. The primary analysis was then restored to the report design, so that the
+confirmatory tests use the method specified beforehand and the pooled variant is reported for
+what it is: a post-hoc improvement.
 
 ## 7. Metrics
 
@@ -206,8 +237,8 @@ All metrics are computed per held-out subject:
 * **confidence distortion**: mean confidence, the "confidently wrong" share (wrong with
   confidence ≥ 0.8), and ECE;
 * **false-rejection rate**: the flag rate on clean windows;
-* detection AUROC: the suspicion −log min R on attacked versus clean windows, both overall and
-  per evidence channel (the detectability matrix);
+* detection AUROC: the calibrated anomaly margin (§6.4) on attacked versus clean windows, both
+  overall and per evidence channel (the detectability matrix);
 * defense gain = defended F1 − fixed F1;
 * clean cost = fixed F1 − defended F1, on clean data;
 * the **Suppression Vulnerability Index**: the normalised area under the macro-F1-drop versus
@@ -230,16 +261,19 @@ Secondary analyses:
 * targeted versus random suppression (one-sided Wilcoxon);
 * the attacker ladder;
 * ModDrop versus defended fusion;
-* Q/D/U ablations and a decision-level product-of-experts variant.
+* evidence-subset ablations (Q, D, U, Q+D, Q+U, D+U) and a decision-level product-of-experts
+  variant, all under the primary calibration;
+* the pooled-reference extension of §6.6 for the evidence sets {Q} and {Q, D, U}.
 
 ## 9. Decisions made during development (and why)
 
-1. **Subject-diverse calibration** (§6.6).
-2. **Q reference pooling.** The first calibration used only the two validation subjects. On the
-   clean held-out subject of the first fold this flagged 88 % of windows: S2's skin temperature
-   (≈35 °C) lay outside the band of the two reference subjects. Model-free indicators now use a
-   reference pooled over all non-test subjects. Data-driven amplitude bounds were replaced by
-   physical plausibility bounds. No test subject is involved in either change.
+1. **Primary analysis follows the report** (§6.4, §6.6): Q + D + U, calibrated on the validation
+   subjects only. The pooled-reference variant is an extension.
+2. **Physical plausibility bounds.** An early version derived amplitude bounds from the
+   reference data. On the clean held-out subject of the first fold this flagged 88 % of windows:
+   S2's skin temperature (≈35 °C) lay outside the band of the two reference subjects.
+   Data-driven amplitude bounds were replaced by fixed physical plausibility bounds (§6.1) in
+   both calibration schemes. No test subject is involved in the bounds themselves.
 3. **Neutral substitute** μ_m: chosen in the validation-only study in §6.5.
 4. **Detection score.** −log R saturates for strongly suppressed windows, which made per-modality
    AUROCs identical in the preliminary run. ROC analysis therefore uses the calibrated anomaly
@@ -262,5 +296,8 @@ python -m trustfuse evaluate wesad_binary --workers 4       # -> artifacts/resul
 python -m pytest -q
 ```
 
-The canonical result sets in `artifacts/results/` were produced with exactly these commands and
-the configurations in `configs/`.
+The canonical result sets in `artifacts/results/` were produced with these commands and the
+configurations in `configs/`, run inside the `trustfuse-api` image with the repository's
+`backend/` mounted. The image has no git, so the commit and dirty flag were passed in through
+`TRUSTFUSE_GIT_COMMIT` and `TRUSTFUSE_GIT_DIRTY`; `run.json` also records a SHA-256 of the
+package sources.

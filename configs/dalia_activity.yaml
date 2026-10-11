@@ -7,8 +7,8 @@ description: >-
 split: loso
 n_val: 2
 variants: [fusion, moddrop, uni_bvp, uni_acc]
-seeds: [0]
+seeds: [0, 1, 2]
 aux_seeds: [0]
 eval_variants: [fusion, moddrop]
-eval_seeds: [0]
+eval_seeds: [0, 1, 2]
 manifest_seed: 0

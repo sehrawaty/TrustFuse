@@ -17,7 +17,7 @@ from ..models.checkpoint import find_checkpoint, load_checkpoint
 from ..reliability.engine import ReliabilityEngine
 from ..specs import TaskSpec, get_task
 
-CALIB_VERSION = 3
+CALIB_VERSION = 4   # v4: validation-only references (report scheme) stored next to the pooled extension
 
 
 def release_memory() -> None:
@@ -65,7 +65,7 @@ def _save_calibration(path: Path, engine: ReliabilityEngine) -> None:
     q_pool = state.pop("q_pool")
     buf = io.BytesIO()
     np.savez_compressed(buf, meta=np.frombuffer(json.dumps({"version": CALIB_VERSION, **state}).encode(), dtype=np.uint8),
-                        **{f"val_z__{m}": np.asarray(v, dtype=np.float32) for m, v in val_z.items()},
+                        **{f"val_z__{c}__{m}": np.asarray(v, dtype=np.float32) for c, vs in val_z.items() for m, v in vs.items()},
                         **{f"q_pool__{m}": np.asarray(v, dtype=np.float32) for m, v in q_pool.items()})
     tmp = path.with_suffix(".tmp")
     tmp.write_bytes(buf.getvalue())
@@ -78,7 +78,11 @@ def _load_calibration(path: Path) -> dict | None:
             state = json.loads(bytes(z["meta"]).decode())
             if state.get("version") != CALIB_VERSION:
                 return None
-            state["val_z"] = {k.split("__", 1)[1]: z[k] for k in z.files if k.startswith("val_z__")}
+            state["val_z"] = {}
+            for k in z.files:
+                if k.startswith("val_z__"):
+                    _, scheme, m = k.split("__", 2)
+                    state["val_z"].setdefault(scheme, {})[m] = z[k]
             state["q_pool"] = {k.split("__", 1)[1]: z[k] for k in z.files if k.startswith("q_pool__")}
         return state
     except (OSError, KeyError, ValueError):
@@ -102,7 +106,8 @@ def load_bundle(task_key: str, variant: str, seed: int, subject: str, mc_samples
             if state is not None and state.get("mc_samples") == mc_samples:
                 engine.load_state(state)
             else:
-                # clean data of this fold's non-test subjects only; never the test subject
+                # clean data of this fold's non-test subjects only; never the test subject.
+                # `val` fits the report's validation-only calibration, `ref` only the pooled extension.
                 val = gather(task_key, ckpt["split"]["val"])
                 ref = gather(task_key, ckpt["split"]["train"] + ckpt["split"]["val"], max_per_subject=300)
                 engine.calibrate(val.phys, ref_phys=ref.phys)

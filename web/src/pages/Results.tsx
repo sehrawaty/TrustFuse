@@ -7,7 +7,7 @@ import EChart, { MONO_FONT, ttRow, ttTitle } from "../components/charts/EChart";
 import { HypothesisCards } from "../components/Hypotheses";
 import { Badge, Card, CardHeader, CiText, Empty, InfoTip, PageHeader, Segmented, Select, Skeleton } from "../components/ui";
 import { useConditions, useDetection, useRun, useSummary } from "../components/useRun";
-import { api, downloadUrl, type ConditionAgg, type Summary } from "../lib/api";
+import { api, downloadUrl, type CI, type ConditionAgg, type Summary } from "../lib/api";
 import { pval, signed } from "../lib/format";
 import { BLUE_RAMP, COLORS, MODALITY_COLOR, MODALITY_LABEL } from "../lib/palette";
 
@@ -721,65 +721,51 @@ function BurstsTab({ s, fusion }: { s: Summary; fusion: ConditionAgg[] }) {
 
 /* ------------------------------------------------------------------ ablations */
 
-function AblationsTab({ s, fusion }: { s: Summary; fusion: ConditionAgg[] }) {
-  const abl = fusion.filter((c) => c.family === "ablation");
-  const variants = Array.from(new Set(abl.map((c) => `${c.components}|${c.strategy}`)));
-  if (!abl.length) return <Card><Empty title="No ablations in this run" /></Card>;
-  const attackCols = [
-    { key: "none", label: "Clean F1", metric: "def_f1" },
-    { key: "mask", label: "Full mask · def F1", metric: "def_f1" },
-    { key: "attenuate", label: "Atten. 80% · def F1", metric: "def_f1" },
-    { key: "mask_auroc", label: "Full mask · AUROC", metric: "auroc" },
-    { key: "frr", label: "Clean FRR", metric: "flag_rate" },
-  ];
-  const cell = (v: string, col: (typeof attackCols)[number]) => {
-    const [comp, strat] = v.split("|");
-    const pick = abl.filter((c) => c.components === comp && c.strategy === strat);
-    const sel =
-      col.key === "none" || col.key === "frr"
-        ? pick.filter((c) => c.cond.endsWith("attack=none"))
-        : col.key === "attenuate"
-          ? pick.filter((c) => c.cond.endsWith("attack=attenuate"))
-          : pick.filter((c) => c.cond.endsWith("attack=mask") && c.fill === "zero");
-    const vals = sel.map((c) => mm(c, col.metric).mean).filter((x): x is number => x != null);
-    return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
-  };
+function AblationsTab({ s }: { s: Summary; fusion: ConditionAgg[] }) {
+  const points = s.operating_points ?? [];
+  if (!points.length) return <Card><Empty title="No ablations in this run" /></Card>;
+  const pct = (c?: CI) => (c?.mean == null ? "—" : `${(c.mean * 100).toFixed(1)}%`);
+  const num = (c?: CI) => (c?.mean == null ? "—" : c.mean.toFixed(3));
+  const frrMax = s.hypotheses.H4.frr_max;
   return (
     <Card>
-      <CardHeader eyebrow="Ablation" title="Which evidence does the work?" sub="Defended pipeline with subsets of Q / D / U, and a decision-level product-of-experts variant. Attack columns average over target modalities." />
+      <CardHeader
+        eyebrow="Ablation"
+        title="Which evidence and which calibration reference do the work?"
+        sub="The report's defense (highlighted) next to evidence subsets, a decision-level product-of-experts variant, and the pooled-reference extension. Attack columns average over target modalities under full suppression."
+      />
       <table className="w-full text-[12.5px]">
         <thead>
           <tr className="text-left text-[11px] uppercase tracking-wide text-muted">
             <th className="px-5 py-2 font-medium">Evidence</th>
+            <th className="px-3 py-2 font-medium">Calibration</th>
             <th className="px-3 py-2 font-medium">Fusion</th>
-            {attackCols.map((c) => (
-              <th key={c.key} className="px-3 py-2 text-right font-medium">
-                {c.label}
-              </th>
-            ))}
+            <th className="px-3 py-2 text-right font-medium">Clean false flags</th>
+            <th className="px-3 py-2 text-right font-medium">Clean F1</th>
+            <th className="px-3 py-2 text-right font-medium">Suppressed · fixed F1</th>
+            <th className="px-3 py-2 text-right font-medium">Suppressed · defended F1</th>
+            <th className="px-3 py-2 text-right font-medium">Suppressed · flagged</th>
           </tr>
         </thead>
         <tbody>
-          {variants.map((v) => {
-            const [comp, strat] = v.split("|");
-            return (
-              <tr key={v} className={clsx("border-t border-line", comp === "QDU" && strat === "embedding_gate" && "bg-defended-soft/50")}>
-                <td className="px-5 py-1.5 font-mono font-medium">{comp}</td>
-                <td className="px-3 py-1.5 text-muted">{strat === "poe" ? "product of experts" : "embedding gate"}</td>
-                {attackCols.map((c) => {
-                  const x = cell(v, c);
-                  return (
-                    <td key={c.key} className="num px-3 py-1.5 text-right">
-                      {x == null ? "—" : c.metric === "flag_rate" ? `${(x * 100).toFixed(1)}%` : x.toFixed(3)}
-                    </td>
-                  );
-                })}
-              </tr>
-            );
-          })}
+          {points.map((p) => (
+            <tr key={`${p.components}|${p.strategy}|${p.calibration}`} className={clsx("border-t border-line", p.primary && "bg-defended-soft/50")}>
+              <td className="px-5 py-1.5 font-mono font-medium">{p.components.split("").join(" + ")}</td>
+              <td className="px-3 py-1.5 text-muted">{p.calibration === "pooled" ? "pooled (extension)" : "validation (report)"}</td>
+              <td className="px-3 py-1.5 text-muted">{p.strategy === "poe" ? "product of experts" : "embedding gate"}</td>
+              <td className={clsx("num px-3 py-1.5 text-right", p.clean_frr?.mean != null && p.clean_frr.mean > frrMax && "font-medium text-flag-ink")}>{pct(p.clean_frr)}</td>
+              <td className="num px-3 py-1.5 text-right">{num(p.clean_def_f1)}</td>
+              <td className="num px-3 py-1.5 text-right text-muted">{num(p.full_fixed_f1)}</td>
+              <td className="num px-3 py-1.5 text-right">{num(p.full_def_f1)}</td>
+              <td className="num px-3 py-1.5 text-right">{pct(p.full_flag_rate)}</td>
+            </tr>
+          ))}
         </tbody>
       </table>
-      <p className="px-5 py-3 text-[11.5px] text-muted">The highlighted row (Q + D + U, embedding gate) is the configuration used everywhere else. {s.n_subjects} subjects.</p>
+      <p className="px-5 py-3 text-[11.5px] text-muted">
+        The highlighted row is the configuration used everywhere else: the defense as specified in the project report. False-flag rates above the pre-registered limit
+        ({(frrMax * 100).toFixed(0)}%) are marked. {s.n_subjects} subjects.
+      </p>
     </Card>
   );
 }

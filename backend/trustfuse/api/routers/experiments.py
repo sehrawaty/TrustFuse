@@ -25,7 +25,7 @@ PRESETS = {
                         "summary": "Re-run the attack matrix on shipped LOSO models for selected subjects.",
                         "overrides": {"name": "Frozen checkpoints — re-evaluation", "test_subjects": ["S2", "S3", "S4"],
                                       "variants": ["fusion"], "seeds": [0], "eval_seeds": [0], "models_root": "artifacts",
-                                      "reliability": {"ablations": []},
+                                      "reliability": {"ablations": [], "calibration_ablations": []},
                                       "attacks": {"strategies": ["random_drop", "targeted", "oracle"],
                                                   "burst_placements_per_subject": 4}}},
     "wesad_binary": {"file": "wesad_binary.yaml", "label": "Full LOSO · WESAD binary", "minutes": 240,

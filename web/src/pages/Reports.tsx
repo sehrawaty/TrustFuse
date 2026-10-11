@@ -13,7 +13,8 @@ const FILES: [string, string][] = [
   ["detection.json", "Pooled ROC curves and detectability matrix"],
   ["subjects.csv.gz", "Subject-level table (unit of analysis)"],
   ["rows.csv.gz", "Raw measurements: variant × seed × subject × condition"],
-  ["manifest.npz", "Per-window decisions of every attacked window"],
+  ["manifest.npz", "Per-window decisions of every window-level attack"],
+  ["bursts.csv.gz", "Per-window decisions of every burst-affected window"],
   ["calibration.json", "Frozen reliability calibration of each fold"],
   ["config.yaml", "Exact experiment configuration"],
   ["run.json", "Provenance: config hash, versions, commit, timing"],
@@ -123,7 +124,8 @@ export default function Reports() {
               Evidence per modality comprises signal quality <Tex>{"Q_m"}</Tex>, disagreement with the other unimodal heads <Tex>{"D_m"}</Tex>, and MC-dropout uncertainty{" "}
               <Tex>{"U_m"}</Tex>. Their calibrated sum is ranked against clean validation windows to produce a conformal p-value <Tex>{"R_m"}</Tex>. The flag fires when{" "}
               <Tex>{String.raw`\min_m R_m\le\alpha/M`}</Tex>. The gate <Tex>{"w_m"}</Tex> blends <Tex>{"h_m"}</Tex> towards the clean reference embedding{" "}
-              <Tex>{String.raw`\mu_m`}</Tex> before the frozen classifier.
+              <Tex>{String.raw`\mu_m`}</Tex> before the frozen classifier. Every scaling parameter and threshold is fitted on clean validation subjects only and frozen before attack
+              evaluation. A variant that references signal quality to all non-test subjects is evaluated separately as an extension (Results, Ablations).
             </Section>
             <Section title="Statistics">
               The subject is the unit of analysis. Seeds are averaged within each subject. 95 % confidence intervals use a subject-cluster bootstrap with 2,000 resamples.

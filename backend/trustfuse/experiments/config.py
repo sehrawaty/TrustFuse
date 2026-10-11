@@ -46,13 +46,19 @@ class AttackGrid(BaseModel):
 
 
 class ReliabilitySettings(BaseModel):
-    # default operating point: model-free Q with subject-pooled calibration (validation-selected)
-    components: list[Literal["Q", "D", "U"]] = ["Q"]
+    # Primary operating point = the defense specified in the project report (section 4.3.3):
+    # R combines Q, D and U; every scaling parameter and threshold comes from clean validation data.
+    components: list[Literal["Q", "D", "U"]] = ["Q", "D", "U"]
+    calibration: Literal["validation", "pooled"] = "validation"
     mc_samples: int = 8
     alpha: float = 0.05            # target clean false-rejection rate of the low-confidence flag
     gate_span: float = 1.0         # gate closes when anomaly exceeds the threshold by span x (thr - median)
     strategy: Literal["embedding_gate", "poe"] = "embedding_gate"
-    ablations: list[list[Literal["Q", "D", "U"]]] = [["Q", "D", "U"], ["Q", "D"], ["Q", "U"], ["D", "U"], ["D"], ["U"]]
+    # evidence-subset ablations, evaluated under the primary calibration scheme
+    ablations: list[list[Literal["Q", "D", "U"]]] = [["Q"], ["D"], ["U"], ["Q", "D"], ["Q", "U"], ["D", "U"]]
+    # extension: evidence sets re-evaluated under the *other* calibration scheme (subject-pooled Q
+    # reference when the primary scheme is validation-only)
+    calibration_ablations: list[list[Literal["Q", "D", "U"]]] = [["Q"], ["Q", "D", "U"]]
 
 
 class StatsSettings(BaseModel):

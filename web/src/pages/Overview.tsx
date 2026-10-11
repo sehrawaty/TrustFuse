@@ -15,7 +15,7 @@ const CONTRIBUTIONS = [
   },
   {
     title: "Subject-diverse conformal reliability",
-    body: "Per-modality evidence is turned into calibrated p-values, which give a low-confidence flag and a fusion gate on the same frozen model. Calibrating against many people, not just two, is what keeps false alarms on new users near the target rate.",
+    body: "Signal quality, cross-modal disagreement and predictive uncertainty of every modality are combined into a calibrated reliability score, which gives a low-confidence flag and a fusion gate on the same frozen model. Calibration uses clean validation data only; its false-alarm cost on new users is measured, not assumed.",
   },
   {
     title: "Matched security evaluation",

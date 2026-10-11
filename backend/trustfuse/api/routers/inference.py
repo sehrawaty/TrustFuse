@@ -24,7 +24,7 @@ async def infer(req: InferIn) -> dict:
     if attack["type"] != "none" and not attack.get("modality"):
         raise HTTPException(422, "attack.modality is required")
     return await _call(service().infer, req.task, req.subject, req.window, attack, req.variant, req.seed,
-                       req.components, req.strategy)
+                       req.components, req.strategy, req.calibration)
 
 
 @router.post("/attack/targeted")
@@ -45,6 +45,8 @@ async def timeline(req: TimelineIn) -> dict:
 
 @router.get("/calibration/{task}/{subject}")
 async def calibration(task: str, subject: str, variant: str = "fusion", seed: int = 0,
-                      components: str = "Q") -> dict:
+                      components: str = "QDU", calibration: str = "validation") -> dict:
     comps = [c for c in components.upper() if c in "QDU"]
-    return await _call(service().calibration, task, subject, variant, seed, comps or None)
+    if calibration not in ("validation", "pooled"):
+        raise HTTPException(422, "calibration must be 'validation' or 'pooled'")
+    return await _call(service().calibration, task, subject, variant, seed, comps or None, calibration)

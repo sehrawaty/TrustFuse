@@ -3,14 +3,25 @@
  "name": "WESAD binary — full LOSO",
  "description": "Stress (TSST) vs. non-stress (baseline + amusement) from wrist BVP, ACC, EDA and skin temperature. Fixed concatenation fusion vs. reliability-aware fusion under the full SMSA matrix.",
  "task": "wesad_binary",
- "config_hash": "ee7a9b976dd1",
- "created": "2026-10-11T12:56:53Z",
- "seconds": 158.3572416305542,
+ "config_hash": "eb351a04f647",
+ "created": "2026-10-11T18:20:31Z",
+ "seconds": 769.6250035762787,
  "status": "complete",
  "trustfuse": "1.0.0",
- "git_commit": "95b4a92e56a8b6b6b553e11bcdd5114e9a288a3f",
+ "git_commit": "9d57d36cdd7e9f12fbe5453e70a370a13fdc4232",
+ "git_dirty": true,
+ "code_sha256": "a6e48a07c42e01839b79b9a84f2db284a4354bc82b603d0d8f64a4e10fe35193",
+ "defense": {
+  "components": [
+   "Q",
+   "D",
+   "U"
+  ],
+  "calibration": "validation",
+  "strategy": "embedding_gate"
+ },
  "versions": {
-  "python": "3.12.3",
+  "python": "3.12.15",
   "torch": "2.14.1+cpu",
   "numpy": "2.5.4",
   "pandas": "3.0.6"
@@ -45,6 +56,6 @@
   1,
   2
  ],
- "n_rows": 14220,
+ "n_rows": 15780,
  "canonical": true
 }
